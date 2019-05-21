@@ -1,0 +1,35 @@
+package main
+
+import (
+	"fmt"
+	"log"
+
+	"github.com/gin-gonic/gin"
+)
+
+// Version of the service
+const version = "1.0.0"
+
+/**
+ * MAIN
+ */
+func main() {
+	log.Printf("===> V4 Master Search service staring up <===")
+
+	// Get config params; service port, directories, DB
+	cfg := ServiceConfig{}
+	cfg.Load()
+	svc := ServiceContext{}
+	svc.Init(&cfg)
+
+	log.Printf("Setup routes...")
+	gin.SetMode(gin.ReleaseMode)
+	gin.DisableConsoleColor()
+	router := gin.Default()
+	router.GET("/version", svc.GetVersion)
+	router.GET("/healthcheck", svc.HealthCheck)
+
+	portStr := fmt.Sprintf(":%d", cfg.Port)
+	log.Printf("Start service v%s on port %s", version, portStr)
+	log.Fatal(router.Run(portStr))
+}

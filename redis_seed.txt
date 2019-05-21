@@ -1,0 +1,3 @@
+incr V4_PREFIX:next_pool_id 
+hmset V4_PREFIX:pool:1 name "catalog" url "http://docker1.lib.virginia.edu:8461"
+sadd V4_PREFIX:pools 1 
