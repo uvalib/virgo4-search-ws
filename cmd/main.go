@@ -19,8 +19,11 @@ func main() {
 	// Get config params; service port, directories, DB
 	cfg := ServiceConfig{}
 	cfg.Load()
-	svc := ServiceContext{}
-	svc.Init(&cfg)
+	svc := ServiceContext{Version: version}
+	err := svc.Init(&cfg)
+	if err != nil {
+		log.Fatalf("Unable to initialize service: %s", err.Error())
+	}
 
 	log.Printf("Setup routes...")
 	gin.SetMode(gin.ReleaseMode)
