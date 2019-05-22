@@ -5,6 +5,7 @@ import (
 	"log"
 
 	"github.com/gin-gonic/gin"
+	ginprometheus "github.com/zsais/go-gin-prometheus"
 )
 
 // Version of the service
@@ -29,11 +30,19 @@ func main() {
 	gin.SetMode(gin.ReleaseMode)
 	gin.DisableConsoleColor()
 	router := gin.Default()
+	p := ginprometheus.NewPrometheus("gin")
+	p.Use(router)
+
+	router.GET("/", svc.GetVersion)
+	router.GET("/favicon.ico", svc.IgnoreFavicon)
 	router.GET("/version", svc.GetVersion)
 	router.GET("/healthcheck", svc.HealthCheck)
-	router.GET("/pools", svc.GetPools)
-	router.POST("/pools/register", svc.RegisterPool)
-	router.POST("/search", svc.Search)
+	api := router.Group("/api")
+	{
+		api.GET("/pools", svc.GetPools)
+		api.POST("/pools/register", svc.RegisterPool)
+		api.POST("/search", svc.Search)
+	}
 
 	portStr := fmt.Sprintf(":%d", cfg.Port)
 	log.Printf("Start service v%s on port %s", version, portStr)

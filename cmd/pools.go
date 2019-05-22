@@ -14,8 +14,8 @@ import (
 // Pool defines the attributes of a search pool
 type Pool struct {
 	ID    string `json:"id"`
-	Name  string `json:"name"`
-	URL   string `json:"url"`
+	Name  string `json:"name" binding:"required"`
+	URL   string `json:"url" binding:"required"`
 	Alive bool   `json:"alive"`
 }
 
@@ -69,11 +69,75 @@ func (p *Pool) Ping() bool {
 
 // GetPools gets a list of all active pools and returns it as JSON
 func (svc *ServiceContext) GetPools(c *gin.Context) {
-	c.String(http.StatusNotImplemented, "Not yet implemented")
+	c.JSON(http.StatusOK, svc.Pools)
 }
 
 // RegisterPool is called by a pool. It will be added to the list of
 // pools that will be queried by  /search
 func (svc *ServiceContext) RegisterPool(c *gin.Context) {
-	c.String(http.StatusNotImplemented, "Not yet implemented")
+	var pool Pool
+	err := c.ShouldBindJSON(&pool)
+	if err != nil {
+		log.Printf("ERROR: register failed - %s", err.Error())
+		c.String(http.StatusBadRequest, err.Error())
+		return
+	}
+
+	log.Printf("Received register for %+v", pool)
+	if pool.Ping() == false {
+		log.Printf("ERROR: New pool %s:%s failed ping test", pool.Name, pool.URL)
+		c.String(http.StatusBadRequest, "Failed ping test")
+		return
+	}
+
+	// See if this pool already exists
+	isNew := true
+	for _, p := range svc.Pools {
+		if p.Name == pool.Name {
+			p.URL = pool.URL
+			p.Alive = true
+			isNew = false
+			break
+		}
+	}
+
+	if isNew == true {
+		log.Printf("Registering new pool %+v", pool)
+		poolIDKey := fmt.Sprintf("%s:next_pool_id", svc.RedisPrefix)
+		newID, err := svc.Redis.Incr(poolIDKey).Result()
+		if err != nil {
+			log.Printf("ERROR: Unable to get ID new service: %s", err.Error())
+			c.String(http.StatusInternalServerError, err.Error())
+			return
+		}
+		pool.ID = fmt.Sprintf("%d", newID)
+		redisErr := svc.updateRedis(&pool, true)
+		if redisErr != nil {
+			log.Printf("Unable to get update redis %s", redisErr.Error())
+			c.String(http.StatusInternalServerError, redisErr.Error())
+			return
+		}
+		svc.Pools = append(svc.Pools, &pool)
+	}
+
+	c.String(http.StatusOK, "registered")
+}
+
+func (svc *ServiceContext) updateRedis(pool *Pool, newPool bool) error {
+	redisID := fmt.Sprintf("%s:pool:%s", svc.RedisPrefix, pool.ID)
+	_, err := svc.Redis.HMSet(redisID, map[string]interface{}{
+		"id":   pool.ID,
+		"name": pool.Name,
+		"url":  pool.URL,
+	}).Result()
+	if err != nil {
+		return err
+	}
+
+	// This is a new pool.. add the ID to *:pools
+	if newPool {
+		servicesKey := fmt.Sprintf("%s:pools", svc.RedisPrefix)
+		_, err = svc.Redis.SAdd(servicesKey, pool.ID).Result()
+	}
+	return err
 }

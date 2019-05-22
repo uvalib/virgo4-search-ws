@@ -10,11 +10,12 @@ and aggregrate results. The API details are here: https://github.com/uvalib/v4-a
 
 * GET /version : return service version info
 * GET /healthcheck : test health of system components; results returned as JSON.
-* GET /pools : Get a JSON list search pools that can be queried.
-* POST /pools/register called by seach pools to register as a pool the master will query.
+* GET /metrics : returns Prometheus metrics
+* GET /api/pools : Get a JSON list search pools that can be queried.
+* POST /api/oIf not present, the POST will fail. ols/register called by seach pools to register as a pool the master will query.
    * JSON Payload: {"name":"NAME", "url":"URL"}. 
    * Note: before add or update, the pool will be pinged and the response scanned for expected content. 
-* POST /search search over all pools
+* POST /api/earch search over all pools
 
 ### Redis Notes
 

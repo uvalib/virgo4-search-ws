@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -15,7 +17,7 @@ type ServiceContext struct {
 	Version     string
 	RedisPrefix string
 	Redis       *redis.Client
-	Pools       []Pool
+	Pools       []*Pool
 }
 
 // Init will initialize the service context based on the config parameters. Any
@@ -59,7 +61,7 @@ func (svc *ServiceContext) Init(cfg *ServiceConfig) error {
 		// create a and track a service; assume it is not alive by default
 		// ping  will test and update this alive status
 		pool := Pool{ID: poolID, Name: pInfo["name"], URL: pInfo["url"], Alive: false}
-		svc.Pools = append(svc.Pools, pool)
+		svc.Pools = append(svc.Pools, &pool)
 		log.Printf("Init %s - %s...", pool.Name, pool.URL)
 		if pool.Ping() == false {
 			log.Printf("   * %s is not available", pool.Name)
@@ -96,9 +98,22 @@ func (svc *ServiceContext) PingPools() {
 	}
 }
 
+// IgnoreFavicon is a dummy to handle browser favicon requests without warnings
+func (svc *ServiceContext) IgnoreFavicon(c *gin.Context) {
+}
+
 // GetVersion reports the version of the serivce
 func (svc *ServiceContext) GetVersion(c *gin.Context) {
-	c.String(http.StatusOK, "V4 Master Search Service version %s", svc.GetVersion)
+	build := "unknown"
+	files, _ := filepath.Glob("buildtag.*")
+	if len(files) == 1 {
+		build = strings.Replace(files[0], "buildtag.", "", 1)
+	}
+
+	vMap := make(map[string]string)
+	vMap["version"] = svc.Version
+	vMap["build"] = build
+	c.JSON(http.StatusOK, vMap)
 }
 
 // HealthCheck reports the health of the serivce
