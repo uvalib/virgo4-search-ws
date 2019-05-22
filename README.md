@@ -11,11 +11,9 @@ and aggregrate results. The API details are here: https://github.com/uvalib/v4-a
 * GET /version : return service version info
 * GET /healthcheck : test health of system components; results returned as JSON.
 * GET /pools : Get a JSON list search pools that can be queried.
-* POST /pools : Add a new search pool
+* POST /pools/register called by seach pools to register as a pool the master will query.
    * JSON Payload: {"name":"NAME", "url":"URL"}. 
-   * Note: before add or update, the service will be pinged and the response scanned for expected content. If not present, the POST will fail. 
-* PUT /pools : Update an existing service
-   * Same payload and notes as POST
+   * Note: before add or update, the pool will be pinged and the response scanned for expected content. 
 * POST /search search over all pools
 
 ### Redis Notes

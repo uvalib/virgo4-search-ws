@@ -28,6 +28,9 @@ func main() {
 	router := gin.Default()
 	router.GET("/version", svc.GetVersion)
 	router.GET("/healthcheck", svc.HealthCheck)
+	router.GET("/pools", svc.GetPools)
+	router.POST("/pools/register", svc.RegisterPool)
+	router.POST("/search", svc.Search)
 
 	portStr := fmt.Sprintf(":%d", cfg.Port)
 	log.Printf("Start service v%s on port %s", version, portStr)
