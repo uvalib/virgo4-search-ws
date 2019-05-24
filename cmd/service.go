@@ -80,7 +80,6 @@ func (svc *ServiceContext) Init(cfg *ServiceConfig) error {
 			svc.PingPools()
 		}
 	}()
-	defer ticker.Stop()
 
 	return nil
 }

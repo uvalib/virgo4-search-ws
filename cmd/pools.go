@@ -93,8 +93,9 @@ func (svc *ServiceContext) RegisterPool(c *gin.Context) {
 	// See if this pool already exists
 	isNew := true
 	for _, p := range svc.Pools {
-		if p.Name == pool.Name {
+		if p.Name == pool.Name || p.URL == pool.URL {
 			p.URL = pool.URL
+			p.Name = pool.Name
 			p.Alive = true
 			isNew = false
 			break
