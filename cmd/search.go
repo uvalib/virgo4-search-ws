@@ -89,20 +89,29 @@ func (svc *ServiceContext) Search(c *gin.Context) {
 		return
 	}
 
+	defaultPool := "catalog"
+	if req.Preferences != nil {
+		defaultPool = req.Preferences.DefaultPool
+		if defaultPool == "" {
+			defaultPool = "catalog"
+		}
+	}
+	log.Printf("Default search pool: %s", defaultPool)
+
 	var tgtPool *Pool
 	for _, p := range svc.Pools {
 		if p.Alive == false {
 			continue
 		}
-		if p.Name == req.Preferences.DefaultPool {
+		if p.Name == defaultPool {
 			log.Printf("Found default pool %s, searching...", p.Name)
 			tgtPool = p
 		}
 	}
 
 	if tgtPool == nil {
-		log.Printf("ERROR: default search pool %s not found", req.Preferences.DefaultPool)
-		c.String(http.StatusBadRequest, "Pool %s not found", req.Preferences.DefaultPool)
+		log.Printf("ERROR: default search pool %s not found", defaultPool)
+		c.String(http.StatusBadRequest, "Pool %s not found", defaultPool)
 		return
 	}
 
