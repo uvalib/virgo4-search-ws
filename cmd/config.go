@@ -26,7 +26,7 @@ func (cfg *ServiceConfig) Load() {
 
 	flag.Parse()
 
-	log.Printf("%#v", cfg)
+	log.Printf("Redis Cfg: %s:%d prefix: %s", cfg.RedisHost, cfg.RedisPort, cfg.RedisPrefix)
 
 	// if anything is still not set, die
 	if cfg.RedisHost == "" || cfg.RedisPrefix == "" {
