@@ -13,9 +13,44 @@ import (
 
 // Pool defines the attributes of a search pool
 type Pool struct {
-	ID    string `json:"id"`
-	URL   string `json:"url" binding:"required"`
-	Alive bool   `json:"alive"`
+	ID          string `json:"id"`
+	Name        string `json:"name"`
+	Description string `json:"description"`
+	URL         string `json:"url" binding:"required"`
+	Alive       bool   `json:"alive"`
+}
+
+// Identify will call the pool /identify endpoint and add descriptive info to the pool
+func (p *Pool) Identify() bool {
+	timeout := time.Duration(5 * time.Second)
+	client := http.Client{
+		Timeout: timeout,
+	}
+	URL := fmt.Sprintf("%s/identify", p.URL)
+	resp, err := client.Get(URL)
+	if err != nil {
+		log.Printf("ERROR: %s /identify failed: %s", p.URL, err.Error())
+		p.Alive = false
+		return false
+	}
+
+	defer resp.Body.Close()
+	if resp.StatusCode != 200 {
+		log.Printf("   * FAIL: %s/identify returned bad status code : %d: ", p.URL, resp.StatusCode)
+		p.Alive = false
+		return false
+	}
+
+	type idResp struct {
+		Name        string `json:"name"`
+		Description string `json:"description"`
+	}
+	var identity idResp
+	respTxt, _ := ioutil.ReadAll(resp.Body)
+	json.Unmarshal(respTxt, &identity)
+	p.Name = identity.Name
+	p.Description = identity.Description
+	return true
 }
 
 // Ping will check the health of a pool by calling /healthcheck and looking for good status
@@ -88,6 +123,9 @@ func (svc *ServiceContext) RegisterPool(c *gin.Context) {
 		c.String(http.StatusBadRequest, "Failed ping test")
 		return
 	}
+
+	// Grab some identify info from the pool API
+	pool.Identify()
 
 	// See if this pool already exists
 	isNew := true

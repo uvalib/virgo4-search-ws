@@ -67,6 +67,7 @@ func (svc *ServiceContext) Init(cfg *ServiceConfig) error {
 			log.Printf("   * %s is not available", pool.URL)
 		} else {
 			log.Printf("   * %s is alive", pool.URL)
+			pool.Identify()
 		}
 	}
 
