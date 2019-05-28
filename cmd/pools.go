@@ -14,7 +14,6 @@ import (
 // Pool defines the attributes of a search pool
 type Pool struct {
 	ID    string `json:"id"`
-	Name  string `json:"name" binding:"required"`
 	URL   string `json:"url" binding:"required"`
 	Alive bool   `json:"alive"`
 }
@@ -28,14 +27,14 @@ func (p *Pool) Ping() bool {
 	hcURL := fmt.Sprintf("%s/healthcheck", p.URL)
 	resp, err := client.Get(hcURL)
 	if err != nil {
-		log.Printf("ERROR: Pool %s ping failed: %s", p.Name, err.Error())
+		log.Printf("ERROR: %s ping failed: %s", p.URL, err.Error())
 		p.Alive = false
 		return false
 	}
 
 	defer resp.Body.Close()
 	if resp.StatusCode != 200 {
-		log.Printf("   * FAIL: Pool %s returned bad status code : %d: ", p.Name, resp.StatusCode)
+		log.Printf("   * FAIL: %s returned bad status code : %d: ", p.URL, resp.StatusCode)
 		p.Alive = false
 		return false
 	}
@@ -43,7 +42,7 @@ func (p *Pool) Ping() bool {
 	// read response and make sure it contains the name of the service
 	respTxt, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
-		log.Printf("   * FAIL: Pool %s returned unreadable response : %s: ", p.Name, err.Error())
+		log.Printf("   * FAIL: %s returned unreadable response : %s: ", p.URL, err.Error())
 		p.Alive = false
 		return false
 	}
@@ -52,14 +51,14 @@ func (p *Pool) Ping() bool {
 	parsed := make(map[string]string)
 	err = json.Unmarshal([]byte(respTxt), &parsed)
 	if err != nil {
-		log.Printf("   * FAIL: Pool %s returned invalid response : %s: ", p.Name, err.Error())
+		log.Printf("   * FAIL: %s returned invalid response : %s: ", p.URL, err.Error())
 		return false
 	}
 
 	// Walk the values and look for any 'false'. Fail if found
 	for key, val := range parsed {
 		if val != "true" {
-			log.Printf("   * FAIL: Pool %s has failed component %s", p.Name, key)
+			log.Printf("   * FAIL: %s has failed component %s", p.URL, key)
 		}
 	}
 
@@ -85,7 +84,7 @@ func (svc *ServiceContext) RegisterPool(c *gin.Context) {
 
 	log.Printf("Received register for %+v", pool)
 	if pool.Ping() == false {
-		log.Printf("ERROR: New pool %s:%s failed ping test", pool.Name, pool.URL)
+		log.Printf("ERROR: New pool %s failed ping test", pool.URL)
 		c.String(http.StatusBadRequest, "Failed ping test")
 		return
 	}
@@ -93,9 +92,7 @@ func (svc *ServiceContext) RegisterPool(c *gin.Context) {
 	// See if this pool already exists
 	isNew := true
 	for _, p := range svc.Pools {
-		if p.Name == pool.Name || p.URL == pool.URL {
-			p.URL = pool.URL
-			p.Name = pool.Name
+		if p.URL == pool.URL {
 			p.Alive = true
 			isNew = false
 			break
@@ -103,7 +100,7 @@ func (svc *ServiceContext) RegisterPool(c *gin.Context) {
 	}
 
 	if isNew == true {
-		log.Printf("Registering new pool %+v", pool)
+		log.Printf("Registering new pool %s", pool.URL)
 		poolIDKey := fmt.Sprintf("%s:next_pool_id", svc.RedisPrefix)
 		newID, err := svc.Redis.Incr(poolIDKey).Result()
 		if err != nil {
@@ -127,9 +124,8 @@ func (svc *ServiceContext) RegisterPool(c *gin.Context) {
 func (svc *ServiceContext) updateRedis(pool *Pool, newPool bool) error {
 	redisID := fmt.Sprintf("%s:pool:%s", svc.RedisPrefix, pool.ID)
 	_, err := svc.Redis.HMSet(redisID, map[string]interface{}{
-		"id":   pool.ID,
-		"name": pool.Name,
-		"url":  pool.URL,
+		"id":  pool.ID,
+		"url": pool.URL,
 	}).Result()
 	if err != nil {
 		return err

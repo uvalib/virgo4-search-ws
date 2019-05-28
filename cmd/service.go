@@ -60,13 +60,13 @@ func (svc *ServiceContext) Init(cfg *ServiceConfig) error {
 
 		// create a and track a service; assume it is not alive by default
 		// ping  will test and update this alive status
-		pool := Pool{ID: poolID, Name: pInfo["name"], URL: pInfo["url"], Alive: false}
+		pool := Pool{ID: poolID, URL: pInfo["url"], Alive: false}
 		svc.Pools = append(svc.Pools, &pool)
-		log.Printf("Init %s - %s...", pool.Name, pool.URL)
+		log.Printf("Init %s...", pool.URL)
 		if pool.Ping() == false {
-			log.Printf("   * %s is not available", pool.Name)
+			log.Printf("   * %s is not available", pool.URL)
 		} else {
-			log.Printf("   * %s is alive", pool.Name)
+			log.Printf("   * %s is alive", pool.URL)
 		}
 	}
 
@@ -121,9 +121,9 @@ func (svc *ServiceContext) HealthCheck(c *gin.Context) {
 	hcMap["v4search"] = "true"
 	for _, p := range svc.Pools {
 		if p.Ping() {
-			hcMap[p.Name] = "true"
+			hcMap[p.URL] = "true"
 		} else {
-			hcMap[p.Name] = "false"
+			hcMap[p.URL] = "false"
 		}
 	}
 	c.JSON(http.StatusOK, hcMap)

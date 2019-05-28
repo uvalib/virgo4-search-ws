@@ -7,25 +7,11 @@ import (
 	"io/ioutil"
 	"log"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/gin-gonic/gin"
 )
-
-// Sort cantains data to define search sort order
-type Sort struct {
-	Field string `json:"field"`
-	Order string `json:"order"`
-}
-
-// Query defines the search terms and order
-type Query struct {
-	Keyword string `json:"keyword,omitempty"`
-	Author  string `json:"author,omitempty"`
-	Title   string `json:"title,omitempty"`
-	Subject string `json:"subject,omitempty"`
-	Sort    *Sort  `json:"sort"`
-}
 
 // Pagination cantains pagination info
 type Pagination struct {
@@ -34,21 +20,12 @@ type Pagination struct {
 	Total int `json:"total,omitempty"`
 }
 
-// Preferences cantains search preferences
-type Preferences struct {
-	DefaultPool  string   `json:"default_search_pool"`
-	ExcludePools []string `json:"excluded_pools"`
-}
-
-// PoolResults is the response from a single pool
-type PoolResults struct {
-	PoolID     string      `json:"pool_id"`
+// PoolResult is the response from a single pool
+type PoolResult struct {
 	ServiceURL string      `json:"service_url"`
-	Summary    string      `json:"summary"`
-	ElapsedMS  int64       `json:"elapsed_ms"`
+	ElapsedMS  int64       `json:"elapsed_ms,omitempty"`
 	Pagination *Pagination `json:"pagination"`
 	Records    []*Record   `json:"record_list"`
-	Filters    string      `json:"filters,omitempty"`
 	Confidence string      `json:"confidence,omitempty"`
 }
 
@@ -61,16 +38,26 @@ type Record struct {
 
 // SearchRequest contains all of the data necessary for a client seatch request
 type SearchRequest struct {
-	Query       *Query       `json:"query"`
-	Pagination  *Pagination  `json:"pagination"`
-	Preferences *Preferences `json:"search_preferences"`
+	Query      string      `json:"query"`
+	Pagination *Pagination `json:"pagination"`
 }
 
 // SearchResponse contains all search resonse data
 type SearchResponse struct {
-	ActualRequest    *SearchRequest `json:"actual_request"`
-	EffectiveRequest *SearchRequest `json:"summary,omitempty"`
-	Results          []*PoolResults `json:"pool_results"`
+	Request       *SearchRequest `json:"request"`
+	PoolsSearched int            `json:"pools_searched"`
+	TotalTimeMS   int64          `json:"total_time_ms"`
+	TotalHits     int            `json:"total_hits"`
+	Results       []*PoolResult  `json:"pool_results"`
+}
+
+// AsyncResponse is a wrapper around the data returned on a channel from the
+// goroutine that gets search results from a pool
+type AsyncResponse struct {
+	PoolURL    string
+	StatusCode int
+	Message    string
+	Results    *PoolResult
 }
 
 // Search queries all pools for results, collects and curates results. Responds with JSON.
@@ -89,33 +76,41 @@ func (svc *ServiceContext) Search(c *gin.Context) {
 		return
 	}
 
-	defaultPool := "catalog"
-	if req.Preferences != nil {
-		defaultPool = req.Preferences.DefaultPool
-		if defaultPool == "" {
-			defaultPool = "catalog"
-		}
-	}
-	log.Printf("Default search pool: %s", defaultPool)
-
-	var tgtPool *Pool
+	// Kick off all pool requests in parallel and wait for all to respond
+	out := SearchResponse{Request: &req}
+	start := time.Now()
+	channel := make(chan AsyncResponse)
+	outstandingRequests := 0
 	for _, p := range svc.Pools {
 		if p.Alive == false {
 			continue
 		}
-		if p.Name == defaultPool {
-			log.Printf("Found default pool %s, searching...", p.Name)
-			tgtPool = p
+		outstandingRequests++
+		out.PoolsSearched++
+		go searchPool(p, req, channel)
+	}
+
+	// wait for all to be done and get respnses as they come in
+	for outstandingRequests > 0 {
+		asyncResult := <-channel
+		if asyncResult.StatusCode == http.StatusOK {
+			out.Results = append(out.Results, asyncResult.Results)
+		} else {
+			log.Printf("ERROR: %s returned %d:%s", asyncResult.PoolURL,
+				asyncResult.StatusCode, asyncResult.Message)
 		}
 	}
 
-	if tgtPool == nil {
-		log.Printf("ERROR: default search pool %s not found", defaultPool)
-		c.String(http.StatusBadRequest, "Pool %s not found", defaultPool)
-		return
-	}
+	// Total time for all respones (basically the longest response)
+	elapsedNanoSec := time.Since(start)
+	out.TotalTimeMS = int64(elapsedNanoSec / time.Millisecond)
 
-	sURL := fmt.Sprintf("%s/api/search", tgtPool.URL)
+	c.JSON(http.StatusOK, out)
+}
+
+// Goroutine to do a pool search and return the PoolResults on the channel
+func searchPool(pool *Pool, req SearchRequest, channel chan AsyncResponse) {
+	sURL := fmt.Sprintf("%s/api/search", pool.URL)
 	log.Printf("POST search to %s", sURL)
 	respBytes, _ := json.Marshal(req)
 	postReq, _ := http.NewRequest("POST", sURL, bytes.NewBuffer(respBytes))
@@ -130,38 +125,38 @@ func (svc *ServiceContext) Search(c *gin.Context) {
 	elapsedNanoSec := time.Since(start)
 	elapsedMS := int64(elapsedNanoSec / time.Millisecond)
 	if err != nil {
-		log.Printf("ERROR: Pool query POST to %s failed: %s", sURL, err.Error())
-		c.String(http.StatusInternalServerError, err.Error())
+		status := http.StatusBadRequest
+		errMsg := err.Error()
+		if strings.Contains(err.Error(), "Timeout") {
+			status = http.StatusRequestTimeout
+			errMsg = "request timed out"
+		} else if strings.Contains(err.Error(), "connection refused") {
+			status = http.StatusServiceUnavailable
+			errMsg = "system is offline"
+		}
+		pool.Alive = false
+		channel <- AsyncResponse{PoolURL: pool.URL, StatusCode: status, Message: errMsg}
 		return
 	}
 	defer postResp.Body.Close()
 	bodyBytes, _ := ioutil.ReadAll(postResp.Body)
 
 	if postResp.StatusCode != 200 {
-		log.Printf("ERROR: Pool query to %s FAILED with status %d:%s. Elapsed Time: %dms",
-			sURL, postResp.StatusCode, bodyBytes, elapsedMS)
-		c.String(postResp.StatusCode, string(bodyBytes))
+		channel <- AsyncResponse{PoolURL: pool.URL, StatusCode: postResp.StatusCode, Message: string(bodyBytes)}
 		return
 	}
 
 	log.Printf("Successful pool response from %s. Elapsed Time: %dms", sURL, elapsedMS)
 	log.Printf("RESPONSE: %s", string(bodyBytes))
-	type poolResp struct {
-		Results []*PoolResults `json:"results_pools"`
-	}
-	var rawResp poolResp
-	err = json.Unmarshal(bodyBytes, &rawResp)
+	var poolResp PoolResult
+	err = json.Unmarshal(bodyBytes, &poolResp)
 	if err != nil {
 		log.Printf("ERROR: Unable to parse pool response: %s", err.Error())
-		c.String(http.StatusInternalServerError, err.Error())
+		channel <- AsyncResponse{PoolURL: pool.URL, StatusCode: http.StatusTeapot, Message: err.Error()}
 		return
 	}
 
 	// Add elapsed time and stick it in the master search results format
-	pr := rawResp.Results[0]
-	pr.ElapsedMS = elapsedMS
-	out := SearchResponse{ActualRequest: &req}
-	out.Results = append(out.Results, pr)
-
-	c.JSON(http.StatusOK, out)
+	poolResp.ElapsedMS = elapsedMS
+	channel <- AsyncResponse{PoolURL: pool.URL, StatusCode: http.StatusOK, Results: &poolResp}
 }
