@@ -95,10 +95,12 @@ func (svc *ServiceContext) Search(c *gin.Context) {
 		asyncResult := <-channel
 		if asyncResult.StatusCode == http.StatusOK {
 			out.Results = append(out.Results, asyncResult.Results)
+			out.TotalHits += asyncResult.Results.Pagination.Total
 		} else {
 			log.Printf("ERROR: %s returned %d:%s", asyncResult.PoolURL,
 				asyncResult.StatusCode, asyncResult.Message)
 		}
+		outstandingRequests--
 	}
 
 	// Total time for all respones (basically the longest response)
