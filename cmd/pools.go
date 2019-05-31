@@ -116,9 +116,11 @@ func (svc *ServiceContext) DeRegisterPool(c *gin.Context) {
 	}
 
 	var delPool *Pool
-	for _, p := range svc.Pools {
+	poolIdx := -1
+	for idx, p := range svc.Pools {
 		if p.URL == tgtURL {
 			delPool = p
+			poolIdx = idx
 			break
 		}
 	}
@@ -143,7 +145,7 @@ func (svc *ServiceContext) DeRegisterPool(c *gin.Context) {
 		c.String(http.StatusInternalServerError, err.Error())
 		return
 	}
-
+	svc.Pools = append(svc.Pools[:poolIdx], svc.Pools[poolIdx+1:]...)
 	c.String(http.StatusOK, "unregistered %s", tgtURL)
 }
 
