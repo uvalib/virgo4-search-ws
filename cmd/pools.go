@@ -106,6 +106,47 @@ func (svc *ServiceContext) GetPools(c *gin.Context) {
 	c.JSON(http.StatusOK, svc.Pools)
 }
 
+// DeRegisterPool will remove a pool by URL passed in the request
+func (svc *ServiceContext) DeRegisterPool(c *gin.Context) {
+	tgtURL := c.Query("url")
+	if tgtURL == "" {
+		log.Printf("ERROR: missing url param")
+		c.String(http.StatusBadRequest, "Missing required url param")
+		return
+	}
+
+	var delPool *Pool
+	for _, p := range svc.Pools {
+		if p.URL == tgtURL {
+			delPool = p
+			break
+		}
+	}
+	if delPool == nil {
+		log.Printf("ERROR: %s is not registered", tgtURL)
+		c.String(http.StatusBadRequest, "%s is not registered", tgtURL)
+		return
+	}
+
+	redisID := fmt.Sprintf("%s:pool:%s", svc.RedisPrefix, delPool.ID)
+	_, err := svc.Redis.Del(redisID).Result()
+	if err != nil {
+		log.Printf("ERROR: Unable to delete %s : %s", tgtURL, err.Error())
+		c.String(http.StatusInternalServerError, err.Error())
+		return
+	}
+
+	servicesKey := fmt.Sprintf("%s:pools", svc.RedisPrefix)
+	_, err = svc.Redis.SRem(servicesKey, delPool.ID).Result()
+	if err != nil {
+		log.Printf("ERROR: Unable to delete pool ID for %s : %s", tgtURL, err.Error())
+		c.String(http.StatusInternalServerError, err.Error())
+		return
+	}
+
+	c.String(http.StatusOK, "unregistered %s", tgtURL)
+}
+
 // RegisterPool is called by a pool. It will be added to the list of
 // pools that will be queried by  /search
 func (svc *ServiceContext) RegisterPool(c *gin.Context) {
