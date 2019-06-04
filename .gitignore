@@ -11,3 +11,4 @@ dist/
 .idea
 env.*
 /pkg
+run.sh

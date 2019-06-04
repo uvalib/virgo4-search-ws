@@ -16,3 +16,6 @@ linux:
 clean:
 	$(GOCLEAN)
 	rm -rf bin
+
+test:
+	$(GOTEST) -v cmd/*
