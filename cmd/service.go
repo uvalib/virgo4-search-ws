@@ -105,7 +105,8 @@ func (svc *ServiceContext) IgnoreFavicon(c *gin.Context) {
 // GetVersion reports the version of the serivce
 func (svc *ServiceContext) GetVersion(c *gin.Context) {
 	build := "unknown"
-	files, _ := filepath.Glob("buildtag.*")
+	// cos our CWD is the bin directory
+	files, _ := filepath.Glob("../buildtag.*")
 	if len(files) == 1 {
 		build = strings.Replace(files[0], "buildtag.", "", 1)
 	}
