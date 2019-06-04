@@ -1,3 +1,17 @@
 incr V4_PREFIX:next_pool_id 
 hmset V4_PREFIX:pool:1 url "http://docker1.lib.virginia.edu:8461"
-sadd V4_PREFIX:pools 1 
+incr V4_PREFIX:next_pool_id 
+hmset V4_PREFIX:pool:2 url "http://docker1.lib.virginia.edu:8462"
+incr V4_PREFIX:next_pool_id 
+hmset V4_PREFIX:pool:3 url "http://docker1.lib.virginia.edu:8463"
+incr V4_PREFIX:next_pool_id 
+hmset V4_PREFIX:pool:4 url "http://docker1.lib.virginia.edu:8464"
+incr V4_PREFIX:next_pool_id 
+hmset V4_PREFIX:pool:5 url "http://docker1.lib.virginia.edu:8465"
+incr V4_PREFIX:next_pool_id 
+hmset V4_PREFIX:pool:6 url "http://docker1.lib.virginia.edu:8466"
+incr V4_PREFIX:next_pool_id 
+hmset V4_PREFIX:pool:7 url "http://docker1.lib.virginia.edu:8467"
+incr V4_PREFIX:next_pool_id 
+hmset V4_PREFIX:pool:8 url "http://docker1.lib.virginia.edu:8468"
+sadd V4_PREFIX:pools 1 2 3 4 5 6 7 8 
