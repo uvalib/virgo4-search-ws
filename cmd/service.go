@@ -33,6 +33,10 @@ func (svc *ServiceContext) Init(cfg *ServiceConfig) error {
 	}
 	if cfg.RedisPass != "" {
 		redisOpts.Password = cfg.RedisPass
+		log.Printf("Connecting to redis DB %d with a password", cfg.RedisDB)
+	} else {
+		redisOpts.Password = ""
+		log.Printf("Connecting to redis DB %d without a password", cfg.RedisDB)
 	}
 	svc.Redis = redis.NewClient(&redisOpts)
 
