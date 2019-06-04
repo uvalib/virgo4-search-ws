@@ -44,6 +44,9 @@ type SearchPreferences struct {
 
 // IsExcluded will return true if the target URL is included in the ExcludePools preferece
 func (p *SearchPreferences) IsExcluded(URL string) bool {
+	if URL == "" {
+		return false
+	}
 	for _, excludedURL := range p.ExcludePools {
 		if excludedURL == URL {
 			return true
@@ -85,6 +88,13 @@ func (svc *ServiceContext) Search(c *gin.Context) {
 	if err := c.BindJSON(&req); err != nil {
 		log.Printf("ERROR: unable to parse search request: %s", err.Error())
 		c.String(http.StatusBadRequest, err.Error())
+		return
+	}
+
+	// see if target pool is also in exclude list
+	if req.Preferences.IsExcluded(req.Preferences.TargetPool) {
+		log.Printf("ERROR: Target Pool %s is also excluded", req.Preferences.TargetPool)
+		c.String(http.StatusBadRequest, "Target pool cannot be excluded")
 		return
 	}
 
