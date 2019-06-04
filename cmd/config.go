@@ -11,6 +11,7 @@ type ServiceConfig struct {
 	RedisPort   int
 	RedisPass   string
 	RedisPrefix string
+	RedisDB     int
 	Port        int
 }
 
@@ -23,6 +24,7 @@ func (cfg *ServiceConfig) Load() {
 	flag.IntVar(&cfg.RedisPort, "redis_port", 6379, "Redis port (default 6379)")
 	flag.StringVar(&cfg.RedisPass, "redis_pass", "", "Redis password")
 	flag.StringVar(&cfg.RedisPrefix, "redis_prefix", "v4_pools", "Redis key prefix")
+	flag.IntVar(&cfg.RedisDB, "redis_db", 0, "Redis database instance")
 
 	flag.Parse()
 

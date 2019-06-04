@@ -27,11 +27,14 @@ func (svc *ServiceContext) Init(cfg *ServiceConfig) error {
 	redisHost := fmt.Sprintf("%s:%d", cfg.RedisHost, cfg.RedisPort)
 	log.Printf("Connect to redis instance at %s", redisHost)
 	svc.RedisPrefix = cfg.RedisPrefix
-	svc.Redis = redis.NewClient(&redis.Options{
-		Addr:     redisHost,
-		Password: cfg.RedisPass,
-		DB:       0, // use default DB
-	})
+	redisOpts := redis.Options{
+		Addr: redisHost,
+		DB:   cfg.RedisDB,
+	}
+	if cfg.RedisPass != "" {
+		redisOpts.Password = cfg.RedisPass
+	}
+	svc.Redis = redis.NewClient(&redisOpts)
 
 	// See if the connection is good...
 	_, err := svc.Redis.Ping().Result()
