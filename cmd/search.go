@@ -36,19 +36,38 @@ type Record struct {
 	Author string `json:"author"`
 }
 
+// SearchPreferences contains preferences for the search
+type SearchPreferences struct {
+	TargetPool   string   `json:"target_pool"`
+	ExcludePools []string `json:"exclude_pool"`
+}
+
+// IsExcluded will return true if the target URL is included in the ExcludePools preferece
+func (p *SearchPreferences) IsExcluded(URL string) bool {
+	for _, excludedURL := range p.ExcludePools {
+		if excludedURL == URL {
+			return true
+		}
+	}
+	return false
+}
+
 // SearchRequest contains all of the data necessary for a client seatch request
 type SearchRequest struct {
-	Query      string      `json:"query"`
-	Pagination *Pagination `json:"pagination"`
+	Query       string             `json:"query"`
+	Pagination  *Pagination        `json:"pagination"`
+	Preferences *SearchPreferences `json:"preferences"`
 }
 
 // SearchResponse contains all search resonse data
 type SearchResponse struct {
-	Request       *SearchRequest `json:"request"`
-	PoolsSearched int            `json:"pools_searched"`
-	TotalTimeMS   int64          `json:"total_time_ms"`
-	TotalHits     int            `json:"total_hits"`
-	Results       []*PoolResult  `json:"pool_results"`
+	Request       *SearchRequest    `json:"request"`
+	PoolsSearched int               `json:"pools_searched"`
+	TotalTimeMS   int64             `json:"total_time_ms"`
+	TotalHits     int               `json:"total_hits"`
+	Results       []*PoolResult     `json:"pool_results"`
+	Debug         map[string]string `json:"debug"`
+	Warn          map[string]string `json:"warn"`
 }
 
 // AsyncResponse is a wrapper around the data returned on a channel from the
@@ -83,6 +102,10 @@ func (svc *ServiceContext) Search(c *gin.Context) {
 	outstandingRequests := 0
 	for _, p := range svc.Pools {
 		if p.Alive == false {
+			continue
+		}
+		if req.Preferences.IsExcluded(p.URL) {
+			log.Printf("Skipping %s as it is part of the excluded URL list", p.URL)
 			continue
 		}
 		outstandingRequests++
