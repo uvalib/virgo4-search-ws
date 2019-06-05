@@ -20,6 +20,19 @@ type ServiceContext struct {
 	Pools       []*Pool
 }
 
+// IsPoolRegistered checks if a pool with the specified URL is registered
+func (svc *ServiceContext) IsPoolRegistered(url string) bool {
+	if url == "" {
+		return false
+	}
+	for _, pool := range svc.Pools {
+		if pool.URL == url && pool.Alive {
+			return true
+		}
+	}
+	return false
+}
+
 // Init will initialize the service context based on the config parameters. Any
 // pools found in redis will be added to the context and polled for status
 func (svc *ServiceContext) Init(cfg *ServiceConfig) error {

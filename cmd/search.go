@@ -22,18 +22,21 @@ type Pagination struct {
 
 // PoolResult is the response from a single pool
 type PoolResult struct {
-	ServiceURL string      `json:"service_url"`
-	ElapsedMS  int64       `json:"elapsed_ms,omitempty"`
-	Pagination *Pagination `json:"pagination"`
-	Records    []*Record   `json:"record_list"`
-	Confidence string      `json:"confidence,omitempty"`
+	ServiceURL string                 `json:"service_url"`
+	ElapsedMS  int64                  `json:"elapsed_ms,omitempty"`
+	Pagination *Pagination            `json:"pagination"`
+	Records    []*Record              `json:"record_list"`
+	Confidence string                 `json:"confidence,omitempty"`
+	Debug      map[string]interface{} `json:"debug"`
+	Warnings   []string               `json:"warnings"`
 }
 
 // Record is a summary of one search hit
 type Record struct {
-	ID     string `json:"id"`
-	Title  string `json:"title"`
-	Author string `json:"author"`
+	ID     string                 `json:"id"`
+	Title  string                 `json:"title"`
+	Author string                 `json:"author"`
+	Debug  map[string]interface{} `json:"debug"`
 }
 
 // SearchPreferences contains preferences for the search
@@ -70,7 +73,7 @@ type SearchResponse struct {
 	TotalHits     int               `json:"total_hits"`
 	Results       []*PoolResult     `json:"pool_results"`
 	Debug         map[string]string `json:"debug"`
-	Warn          map[string]string `json:"warn"`
+	Warnings      []string          `json:"warnings"`
 }
 
 // AsyncResponse is a wrapper around the data returned on a channel from the
@@ -90,6 +93,8 @@ func (svc *ServiceContext) Search(c *gin.Context) {
 		c.String(http.StatusBadRequest, err.Error())
 		return
 	}
+	log.Printf("Search Request %+v", req)
+	out := SearchResponse{Request: &req}
 
 	// see if target pool is also in exclude list
 	if req.Preferences.IsExcluded(req.Preferences.TargetPool) {
@@ -98,15 +103,17 @@ func (svc *ServiceContext) Search(c *gin.Context) {
 		return
 	}
 
-	log.Printf("Search Request %+v", req)
 	if len(svc.Pools) == 0 {
-		log.Printf("ERROR: No search pools registered")
-		c.String(http.StatusInternalServerError, "No search pools available")
-		return
+		log.Printf("WARNING: No search pools registered")
+		out.Warnings = append(out.Warnings, "No pools registered")
+	}
+
+	if svc.IsPoolRegistered(req.Preferences.TargetPool) {
+		log.Printf("WARNING: Target Pool %s is not registered", req.Preferences.TargetPool)
+		out.Warnings = append(out.Warnings, "Target pool is not active")
 	}
 
 	// Kick off all pool requests in parallel and wait for all to respond
-	out := SearchResponse{Request: &req}
 	start := time.Now()
 	channel := make(chan AsyncResponse)
 	outstandingRequests := 0
@@ -136,6 +143,8 @@ func (svc *ServiceContext) Search(c *gin.Context) {
 		outstandingRequests--
 	}
 
+	// TODO sort based on something....
+
 	// Total time for all respones (basically the longest response)
 	elapsedNanoSec := time.Since(start)
 	out.TotalTimeMS = int64(elapsedNanoSec / time.Millisecond)
@@ -145,7 +154,7 @@ func (svc *ServiceContext) Search(c *gin.Context) {
 
 // Goroutine to do a pool search and return the PoolResults on the channel
 func searchPool(pool *Pool, req SearchRequest, channel chan AsyncResponse) {
-	sURL := fmt.Sprintf("%s/api/search", pool.URL)
+	sURL := fmt.Sprintf("%s/api/search?debug=1", pool.URL)
 	log.Printf("POST search to %s", sURL)
 	respBytes, _ := json.Marshal(req)
 	postReq, _ := http.NewRequest("POST", sURL, bytes.NewBuffer(respBytes))
