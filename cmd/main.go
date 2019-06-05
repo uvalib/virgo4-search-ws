@@ -6,6 +6,7 @@ import (
 
 	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
+	"github.com/uvalib/virgo4-parser/v4parser"
 	ginprometheus "github.com/zsais/go-gin-prometheus"
 )
 
@@ -17,6 +18,16 @@ const version = "1.0.0"
  */
 func main() {
 	log.Printf("===> V4 Master Search service staring up <===")
+
+	log.Printf("Testing out teh validtaion behavior...")
+	simple := "title: {bannanas}"
+	validator := v4parser.Validator{}
+	valid, errors := validator.Validate(simple)
+	if valid == false {
+		log.Printf("ERROR: [%s] is not valid, but is should be: %s", simple, errors)
+	} else {
+		log.Printf("SUCCESS: [%s] is valid", simple)
+	}
 
 	// Get config params; service port, directories, DB
 	cfg := ServiceConfig{}
