@@ -10,7 +10,6 @@ require (
 	github.com/onsi/gomega v1.5.0 // indirect
 	github.com/prometheus/client_golang v0.9.3 // indirect
 	github.com/sirupsen/logrus v1.4.2 // indirect
-	github.com/uvalib/virgo4-parser v0.0.0-20190605122044-e3b62a79a132 // indirect
-	github.com/uvalib/virgo4-parser/v4parser v0.0.0-20190605122044-e3b62a79a132
+	github.com/uvalib/virgo4-parser v0.0.0-20190605181546-dcc2c66d7112
 	github.com/zsais/go-gin-prometheus v0.0.0-20181030200533-58963fb32f54
 )

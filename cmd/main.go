@@ -19,10 +19,9 @@ const version = "1.0.0"
 func main() {
 	log.Printf("===> V4 Master Search service staring up <===")
 
-	log.Printf("Testing out teh validtaion behavior...")
+	log.Printf("Testing out the validtaion behavior...")
 	simple := "title: {bannanas}"
-	validator := v4parser.Validator{}
-	valid, errors := validator.Validate(simple)
+	valid, errors := v4parser.Validate(simple)
 	if valid == false {
 		log.Printf("ERROR: [%s] is not valid, but is should be: %s", simple, errors)
 	} else {
