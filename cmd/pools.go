@@ -103,7 +103,11 @@ func (p *Pool) Ping() bool {
 
 // GetPools gets a list of all active pools and returns it as JSON
 func (svc *ServiceContext) GetPools(c *gin.Context) {
-	c.JSON(http.StatusOK, svc.Pools)
+	if len(svc.Pools) == 0 {
+		c.JSON(http.StatusOK, make([]*Pool, 0, 1))
+	} else {
+		c.JSON(http.StatusOK, svc.Pools)
+	}
 }
 
 // DeRegisterPool will remove a pool by URL passed in the request
