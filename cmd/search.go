@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
+	"github.com/uvalib/virgo4-parser/v4parser"
 )
 
 // Pagination cantains pagination info
@@ -95,6 +96,14 @@ func (svc *ServiceContext) Search(c *gin.Context) {
 	}
 	log.Printf("Search Request %+v", req)
 	out := SearchResponse{Request: &req}
+
+	valid, errors := v4parser.Validate(req.Query)
+	if valid == false {
+		log.Printf("ERROR: Query [%s] is not valid: %s", req.Query, errors)
+		c.String(http.StatusBadRequest, errors)
+		return
+	}
+	log.Printf("Query is valid")
 
 	// see if target pool is also in exclude list
 	if req.Preferences.IsExcluded(req.Preferences.TargetPool) {
