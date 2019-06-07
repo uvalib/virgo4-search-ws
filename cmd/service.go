@@ -26,7 +26,9 @@ func (svc *ServiceContext) IsPoolRegistered(url string) bool {
 		return false
 	}
 	for _, pool := range svc.Pools {
+		log.Printf("Pool: %s:%t = tgt %s?", pool.URL, pool.Alive, url)
 		if pool.URL == url && pool.Alive {
+			log.Printf("   match")
 			return true
 		}
 	}
