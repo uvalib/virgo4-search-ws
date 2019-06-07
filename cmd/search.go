@@ -118,8 +118,8 @@ func (s *byConfidence) Swap(i, j int) {
 
 func (s *byConfidence) Less(i, j int) bool {
 	// bubble matching URL to top
-	if s.targetURL == s.results[j].ServiceURL {
-		return false
+	if s.targetURL == s.results[i].ServiceURL {
+		return true
 	}
 	if s.results[i].ConfidenceIndex() < s.results[j].ConfidenceIndex() {
 		return false
