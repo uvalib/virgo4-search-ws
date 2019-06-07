@@ -48,10 +48,11 @@ func (pr *PoolResult) ConfidenceIndex() int {
 
 // Record is a summary of one search hit
 type Record struct {
-	ID     string                 `json:"id"`
-	Title  string                 `json:"title"`
-	Author string                 `json:"author"`
-	Debug  map[string]interface{} `json:"debug"`
+	ID       string                 `json:"id"`
+	Title    string                 `json:"title"`
+	Subtitle string                 `json:"subtitle"`
+	Author   string                 `json:"author"`
+	Debug    map[string]interface{} `json:"debug"`
 }
 
 // SearchPreferences contains preferences for the search

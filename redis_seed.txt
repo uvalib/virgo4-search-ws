@@ -1,17 +1,17 @@
 incr V4_PREFIX:next_pool_id 
-hmset V4_PREFIX:pool:1 url "http://docker1.lib.virginia.edu:8461"
+hmset V4_PREFIX:pool:1 url "https://pool-solr-ws-catalog-dev.internal.lib.virginia.edu"
 incr V4_PREFIX:next_pool_id 
-hmset V4_PREFIX:pool:2 url "http://docker1.lib.virginia.edu:8462"
+hmset V4_PREFIX:pool:2 url "https://pool-solr-ws-catalog-broad-dev.internal.lib.virginia.edu"
 incr V4_PREFIX:next_pool_id 
-hmset V4_PREFIX:pool:3 url "http://docker1.lib.virginia.edu:8463"
+hmset V4_PREFIX:pool:3 url "https://pool-solr-ws-video-dev.internal.lib.virginia.edu"
 incr V4_PREFIX:next_pool_id 
-hmset V4_PREFIX:pool:4 url "http://docker1.lib.virginia.edu:8464"
+hmset V4_PREFIX:pool:4 url "https://pool-solr-ws-archival-dev.internal.lib.virginia.edu"
 incr V4_PREFIX:next_pool_id 
-hmset V4_PREFIX:pool:5 url "http://docker1.lib.virginia.edu:8465"
+hmset V4_PREFIX:pool:5 url "https://pool-solr-ws-serials-dev.internal.lib.virginia.edu"
 incr V4_PREFIX:next_pool_id 
-hmset V4_PREFIX:pool:6 url "http://docker1.lib.virginia.edu:8466"
+hmset V4_PREFIX:pool:6 url "https://pool-solr-ws-sound-recordings-dev.internal.lib.virginia.edu"
 incr V4_PREFIX:next_pool_id 
-hmset V4_PREFIX:pool:7 url "http://docker1.lib.virginia.edu:8467"
+hmset V4_PREFIX:pool:7 url "https://pool-solr-ws-musical-scores-dev.internal.lib.virginia.edu"
 incr V4_PREFIX:next_pool_id 
-hmset V4_PREFIX:pool:8 url "http://docker1.lib.virginia.edu:8468"
+hmset V4_PREFIX:pool:8 url "https://pool-solr-ws-music-recordings-dev.internal.lib.virginia.edu"
 sadd V4_PREFIX:pools 1 2 3 4 5 6 7 8 
