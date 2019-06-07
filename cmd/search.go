@@ -162,7 +162,7 @@ func (svc *ServiceContext) Search(c *gin.Context) {
 		out.Warnings = append(out.Warnings, "No pools registered")
 	}
 
-	if svc.IsPoolRegistered(req.Preferences.TargetPool) {
+	if svc.IsPoolRegistered(req.Preferences.TargetPool) == false {
 		log.Printf("WARNING: Target Pool %s is not registered", req.Preferences.TargetPool)
 		out.Warnings = append(out.Warnings, "Target pool is not active")
 	}
