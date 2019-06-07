@@ -155,7 +155,7 @@ func (svc *ServiceContext) Search(c *gin.Context) {
 	log.Printf("Query is valid")
 
 	// see if target pool is also in exclude list
-	if req.Preferences.IsExcluded(req.Preferences.TargetPool) {
+	if req.Preferences.TargetPool != "" && req.Preferences.IsExcluded(req.Preferences.TargetPool) {
 		log.Printf("ERROR: Target Pool %s is also excluded", req.Preferences.TargetPool)
 		c.String(http.StatusBadRequest, "Target pool cannot be excluded")
 		return
@@ -166,7 +166,7 @@ func (svc *ServiceContext) Search(c *gin.Context) {
 		out.Warnings = append(out.Warnings, "No pools registered")
 	}
 
-	if svc.IsPoolRegistered(req.Preferences.TargetPool) == false {
+	if req.Preferences.TargetPool != "" && svc.IsPoolRegistered(req.Preferences.TargetPool) == false {
 		log.Printf("WARNING: Target Pool %s is not registered", req.Preferences.TargetPool)
 		out.Warnings = append(out.Warnings, "Target pool is not active")
 	}
