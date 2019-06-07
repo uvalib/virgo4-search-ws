@@ -121,6 +121,10 @@ func (s *byConfidence) Less(i, j int) bool {
 	if s.targetURL == s.results[i].ServiceURL {
 		return true
 	}
+	if s.targetURL == s.results[j].ServiceURL {
+		return false
+	}
+	// sort by confidence index
 	if s.results[i].ConfidenceIndex() < s.results[j].ConfidenceIndex() {
 		return false
 	}
