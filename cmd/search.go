@@ -7,6 +7,7 @@ import (
 	"io/ioutil"
 	"log"
 	"net/http"
+	"sort"
 	"strings"
 	"time"
 
@@ -30,6 +31,19 @@ type PoolResult struct {
 	Confidence string                 `json:"confidence,omitempty"`
 	Debug      map[string]interface{} `json:"debug"`
 	Warnings   []string               `json:"warnings"`
+}
+
+// ConfidenceIndex will convert a string confidence into a numeric value
+// with low having the lowest value and exaxt the highest
+func (pr *PoolResult) ConfidenceIndex() int {
+	conf := []string{"low", "medium", "high", "exact"}
+	for idx, val := range conf {
+		if val == pr.Confidence {
+			return idx
+		}
+	}
+	// No confidence match. Assume worst value
+	return 0
 }
 
 // Record is a summary of one search hit
@@ -84,6 +98,36 @@ type AsyncResponse struct {
 	StatusCode int
 	Message    string
 	Results    *PoolResult
+}
+
+// byConfidence will sort responses by confidence, then hit count
+// If a target pool is specified, it will put that one first
+type byConfidence struct {
+	results   []*PoolResult
+	targetURL string
+}
+
+func (s *byConfidence) Len() int {
+	return len(s.results)
+}
+
+func (s *byConfidence) Swap(i, j int) {
+	s.results[i], s.results[j] = s.results[j], s.results[i]
+}
+
+func (s *byConfidence) Less(i, j int) bool {
+	// bubble matching URL to top
+	if s.targetURL == s.results[j].ServiceURL {
+		return false
+	}
+	if s.results[i].ConfidenceIndex() < s.results[j].ConfidenceIndex() {
+		return false
+	}
+	if s.results[i].ConfidenceIndex() > s.results[j].ConfidenceIndex() {
+		return true
+	}
+	// confidence is equal; sort by hit count
+	return s.results[i].Pagination.Total > s.results[j].Pagination.Total
 }
 
 // Search queries all pools for results, collects and curates results. Responds with JSON.
@@ -152,7 +196,9 @@ func (svc *ServiceContext) Search(c *gin.Context) {
 		outstandingRequests--
 	}
 
-	// TODO sort based on something....
+	// Do a basic sort by tagetURL, confidence then hit count
+	confidenceSort := byConfidence{results: out.Results, targetURL: req.Preferences.TargetPool}
+	sort.Sort(&confidenceSort)
 
 	// Total time for all respones (basically the longest response)
 	elapsedNanoSec := time.Since(start)
