@@ -6,6 +6,7 @@ import (
 	"io/ioutil"
 	"log"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -54,7 +55,7 @@ func (p *Pool) Identify() bool {
 }
 
 // Ping will check the health of a pool by calling /healthcheck and looking for good status
-func (p *Pool) Ping() bool {
+func (p *Pool) Ping() error {
 	timeout := time.Duration(5 * time.Second)
 	client := http.Client{
 		Timeout: timeout,
@@ -64,41 +65,25 @@ func (p *Pool) Ping() bool {
 	if err != nil {
 		log.Printf("ERROR: %s ping failed: %s", p.URL, err.Error())
 		p.Alive = false
-		return false
+		return err
 	}
 
 	defer resp.Body.Close()
+	respTxt, _ := ioutil.ReadAll(resp.Body)
 	if resp.StatusCode != 200 {
 		log.Printf("   * FAIL: %s returned bad status code : %d: ", p.URL, resp.StatusCode)
 		p.Alive = false
-		return false
+		return fmt.Errorf("%d:%s", resp.StatusCode, respTxt)
 	}
 
-	// read response and make sure it contains the name of the service
-	respTxt, err := ioutil.ReadAll(resp.Body)
-	if err != nil {
-		log.Printf("   * FAIL: %s returned unreadable response : %s: ", p.URL, err.Error())
+	if strings.Contains(string(respTxt), "false") {
+		log.Printf("   * FAIL: %s has unhealthy components", p.URL)
 		p.Alive = false
-		return false
-	}
-
-	// parse response into a map with string key and value
-	parsed := make(map[string]string)
-	err = json.Unmarshal([]byte(respTxt), &parsed)
-	if err != nil {
-		log.Printf("   * FAIL: %s returned invalid response : %s: ", p.URL, err.Error())
-		return false
-	}
-
-	// Walk the values and look for any 'false'. Fail if found
-	for key, val := range parsed {
-		if val != "true" {
-			log.Printf("   * FAIL: %s has failed component %s", p.URL, key)
-		}
+		return fmt.Errorf("%s", respTxt)
 	}
 
 	p.Alive = true
-	return true
+	return nil
 }
 
 // GetPools gets a list of all active pools and returns it as JSON
@@ -165,7 +150,7 @@ func (svc *ServiceContext) RegisterPool(c *gin.Context) {
 	}
 
 	log.Printf("Received register for %+v", pool)
-	if pool.Ping() == false {
+	if err := pool.Ping(); err != nil {
 		log.Printf("ERROR: New pool %s failed ping test", pool.URL)
 		c.String(http.StatusBadRequest, "Failed ping test")
 		return

@@ -83,8 +83,8 @@ func (svc *ServiceContext) Init(cfg *ServiceConfig) error {
 		pool := Pool{ID: poolID, URL: pInfo["url"], Alive: false}
 		svc.Pools = append(svc.Pools, &pool)
 		log.Printf("Init %s...", pool.URL)
-		if pool.Ping() == false {
-			log.Printf("   * %s is not available", pool.URL)
+		if err := pool.Ping(); err != nil {
+			log.Printf("   * %s is not available: %s", pool.URL, err.Error())
 		} else {
 			log.Printf("   * %s is alive", pool.URL)
 			pool.Identify()
@@ -109,7 +109,8 @@ func (svc *ServiceContext) Init(cfg *ServiceConfig) error {
 func (svc *ServiceContext) PingPools() {
 	errors := false
 	for _, p := range svc.Pools {
-		if p.Ping() == false {
+		if err := p.Ping(); err != nil {
+			log.Printf("   * %s offline: %s", p.URL, err.Error())
 			errors = true
 		}
 	}
@@ -139,14 +140,22 @@ func (svc *ServiceContext) GetVersion(c *gin.Context) {
 
 // HealthCheck reports the health of the serivce
 func (svc *ServiceContext) HealthCheck(c *gin.Context) {
-	hcMap := make(map[string]string)
-	hcMap["v4search"] = "true"
+	type hcResp struct {
+		Healthy bool   `json:"healthy"`
+		Message string `json:"message,omitempty"`
+	}
+	hcMap := make(map[string]hcResp)
 	for _, p := range svc.Pools {
-		if p.Ping() {
-			hcMap[p.URL] = "true"
+		if err := p.Ping(); err != nil {
+			hcMap[p.URL] = hcResp{Healthy: false, Message: err.Error()}
 		} else {
-			hcMap[p.URL] = "false"
+			hcMap[p.URL] = hcResp{Healthy: true}
 		}
+	}
+	if _, err := svc.Redis.Ping().Result(); err != nil {
+		hcMap["redis"] = hcResp{Healthy: false, Message: err.Error()}
+	} else {
+		hcMap["redis"] = hcResp{Healthy: true}
 	}
 	c.JSON(http.StatusOK, hcMap)
 }
