@@ -83,13 +83,19 @@ type SearchRequest struct {
 
 // SearchResponse contains all search resonse data
 type SearchResponse struct {
-	Request       *SearchRequest    `json:"request"`
-	PoolsSearched int               `json:"pools_searched"`
-	TotalTimeMS   int64             `json:"total_time_ms"`
-	TotalHits     int               `json:"total_hits"`
-	Results       []*PoolResult     `json:"pool_results"`
-	Debug         map[string]string `json:"debug"`
-	Warnings      []string          `json:"warnings"`
+	Request       *SearchRequest         `json:"request"`
+	PoolsSearched int                    `json:"pools_searched"`
+	TotalTimeMS   int64                  `json:"total_time_ms"`
+	TotalHits     int                    `json:"total_hits"`
+	Results       []*PoolResult          `json:"pool_results"`
+	Debug         map[string]interface{} `json:"debug"`
+	Warnings      []string               `json:"warnings"`
+}
+
+// NewSearchResponse creates a new instance of a search response initialized
+// with a requet and a blank debug map
+func NewSearchResponse(req *SearchRequest) *SearchResponse {
+	return &SearchResponse{Request: req, Debug: make(map[string]interface{})}
 }
 
 // AsyncResponse is a wrapper around the data returned on a channel from the
@@ -144,7 +150,7 @@ func (svc *ServiceContext) Search(c *gin.Context) {
 		return
 	}
 	log.Printf("Search Request %+v", req)
-	out := SearchResponse{Request: &req}
+	out := NewSearchResponse(&req)
 
 	valid, errors := v4parser.Validate(req.Query)
 	if valid == false {
@@ -209,6 +215,13 @@ func (svc *ServiceContext) Search(c *gin.Context) {
 	elapsedNanoSec := time.Since(start)
 	out.TotalTimeMS = int64(elapsedNanoSec / time.Millisecond)
 
+	out.Warnings = append(out.Warnings, "POOL Test warning 1")
+	out.Warnings = append(out.Warnings, "POOL Test warning 2")
+	out.Warnings = append(out.Warnings, "POOL Test warning 3")
+	out.Debug["debug_test1"] = 101
+	out.Debug["debug_test2"] = "test string"
+	out.Debug["debug_test3"] = 239.769
+
 	c.JSON(http.StatusOK, out)
 }
 
@@ -262,5 +275,10 @@ func searchPool(pool *Pool, req SearchRequest, channel chan AsyncResponse) {
 
 	// Add elapsed time and stick it in the master search results format
 	poolResp.ElapsedMS = elapsedMS
+
+	// Test warnings
+	poolResp.Warnings = append(poolResp.Warnings, "Test warning 1")
+	poolResp.Warnings = append(poolResp.Warnings, "Test warning 2")
+	poolResp.Warnings = append(poolResp.Warnings, "Test warning 3")
 	channel <- AsyncResponse{PoolURL: pool.URL, StatusCode: http.StatusOK, Results: &poolResp}
 }
