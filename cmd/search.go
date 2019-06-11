@@ -215,9 +215,9 @@ func (svc *ServiceContext) Search(c *gin.Context) {
 	elapsedNanoSec := time.Since(start)
 	out.TotalTimeMS = int64(elapsedNanoSec / time.Millisecond)
 
-	out.Warnings = append(out.Warnings, "POOL Test warning 1")
-	out.Warnings = append(out.Warnings, "POOL Test warning 2")
-	out.Warnings = append(out.Warnings, "POOL Test warning 3")
+	out.Warnings = append(out.Warnings, "Test warning 1")
+	out.Warnings = append(out.Warnings, "Test warning 2")
+	out.Warnings = append(out.Warnings, "Test warning 3")
 	out.Debug["debug_test1"] = 101
 	out.Debug["debug_test2"] = "test string"
 	out.Debug["debug_test3"] = 239.769
@@ -277,8 +277,8 @@ func searchPool(pool *Pool, req SearchRequest, channel chan AsyncResponse) {
 	poolResp.ElapsedMS = elapsedMS
 
 	// Test warnings
-	poolResp.Warnings = append(poolResp.Warnings, "Test warning 1")
-	poolResp.Warnings = append(poolResp.Warnings, "Test warning 2")
-	poolResp.Warnings = append(poolResp.Warnings, "Test warning 3")
+	poolResp.Warnings = append(poolResp.Warnings, "POOL Test warning 1")
+	poolResp.Warnings = append(poolResp.Warnings, "POOL Test warning 2")
+	poolResp.Warnings = append(poolResp.Warnings, "POOL Test warning 3")
 	channel <- AsyncResponse{PoolURL: pool.URL, StatusCode: http.StatusOK, Results: &poolResp}
 }
