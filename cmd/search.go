@@ -95,7 +95,8 @@ type SearchResponse struct {
 // NewSearchResponse creates a new instance of a search response initialized
 // with a requet and a blank debug map
 func NewSearchResponse(req *SearchRequest) *SearchResponse {
-	return &SearchResponse{Request: req, Debug: make(map[string]interface{})}
+	return &SearchResponse{Request: req, Results: make([]*PoolResult, 0),
+		Debug: make(map[string]interface{})}
 }
 
 // AsyncResponse is a wrapper around the data returned on a channel from the
