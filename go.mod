@@ -23,7 +23,7 @@ require (
 	github.com/sirupsen/logrus v1.4.2 // indirect
 	github.com/spaolacci/murmur3 v1.1.0 // indirect
 	github.com/stretchr/objx v0.2.0 // indirect
-	github.com/uvalib/virgo4-parser v0.0.0-20190611235942-0facc6ac252f
+	github.com/uvalib/virgo4-parser v0.0.0-20190614175822-6942a7aeeb2b
 	github.com/zsais/go-gin-prometheus v0.0.0-20181030200533-58963fb32f54
 	golang.org/x/crypto v0.0.0-20190611184440-5c40567a22f8 // indirect
 	golang.org/x/net v0.0.0-20190611141213-3f473d35a33a // indirect
