@@ -16,7 +16,7 @@ const version = "1.0.0"
  * MAIN
  */
 func main() {
-	log.Printf("===> V4 Master Search service staring up <===")
+	log.Printf("===> V4 search service staring up <===")
 
 	// Get config params; service port, directories, DB
 	cfg := ServiceConfig{}

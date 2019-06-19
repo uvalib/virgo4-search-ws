@@ -81,6 +81,12 @@ type SearchRequest struct {
 	Preferences *SearchPreferences `json:"preferences"`
 }
 
+// SearchQP defines the query params that should be passed to the pools
+type SearchQP struct {
+	debug  string
+	intuit string
+}
+
 // SearchResponse contains all search resonse data
 type SearchResponse struct {
 	Request       *SearchRequest         `json:"request"`
@@ -178,6 +184,9 @@ func (svc *ServiceContext) Search(c *gin.Context) {
 		out.Warnings = append(out.Warnings, "Target pool is not active")
 	}
 
+	// grab QP config for debug or search intuit
+	qp := SearchQP{debug: c.Query("debug"), intuit: c.Query("intuit")}
+
 	// Kick off all pool requests in parallel and wait for all to respond
 	start := time.Now()
 	channel := make(chan AsyncResponse)
@@ -192,7 +201,7 @@ func (svc *ServiceContext) Search(c *gin.Context) {
 		}
 		outstandingRequests++
 		out.PoolsSearched++
-		go searchPool(p, req, channel)
+		go searchPool(p, req, qp, channel)
 	}
 
 	// wait for all to be done and get respnses as they come in
@@ -227,8 +236,8 @@ func (svc *ServiceContext) Search(c *gin.Context) {
 }
 
 // Goroutine to do a pool search and return the PoolResults on the channel
-func searchPool(pool *Pool, req SearchRequest, channel chan AsyncResponse) {
-	sURL := fmt.Sprintf("%s/api/search?debug=1", pool.URL)
+func searchPool(pool *Pool, req SearchRequest, qp SearchQP, channel chan AsyncResponse) {
+	sURL := fmt.Sprintf("%s/api/search?debug=%s&intuit=%s", pool.URL, qp.debug, qp.intuit)
 	log.Printf("POST search to %s", sURL)
 	respBytes, _ := json.Marshal(req)
 	postReq, _ := http.NewRequest("POST", sURL, bytes.NewBuffer(respBytes))
