@@ -187,6 +187,12 @@ func (svc *ServiceContext) Search(c *gin.Context) {
 	// grab QP config for debug or search intuit
 	qp := SearchQP{debug: c.Query("debug"), intuit: c.Query("intuit")}
 
+	// headers to send to pool
+	headers := map[string]string{
+		"Content-Type": "application/json",
+		"Authorization": c.Request.Header.Get("Authorization"),
+	}
+
 	// Kick off all pool requests in parallel and wait for all to respond
 	start := time.Now()
 	channel := make(chan AsyncResponse)
@@ -201,7 +207,7 @@ func (svc *ServiceContext) Search(c *gin.Context) {
 		}
 		outstandingRequests++
 		out.PoolsSearched++
-		go searchPool(p, req, qp, channel)
+		go searchPool(p, req, qp, headers, channel)
 	}
 
 	// wait for all to be done and get respnses as they come in
@@ -236,12 +242,16 @@ func (svc *ServiceContext) Search(c *gin.Context) {
 }
 
 // Goroutine to do a pool search and return the PoolResults on the channel
-func searchPool(pool *Pool, req SearchRequest, qp SearchQP, channel chan AsyncResponse) {
+func searchPool(pool *Pool, req SearchRequest, qp SearchQP, headers map[string]string, channel chan AsyncResponse) {
 	sURL := fmt.Sprintf("%s/api/search?debug=%s&intuit=%s", pool.URL, qp.debug, qp.intuit)
 	log.Printf("POST search to %s", sURL)
 	respBytes, _ := json.Marshal(req)
 	postReq, _ := http.NewRequest("POST", sURL, bytes.NewBuffer(respBytes))
-	postReq.Header.Set("Content-Type", "application/json")
+
+	for name, val := range headers {
+		postReq.Header.Set(name, val)
+	}
+
 	timeout := time.Duration(15 * time.Second)
 	client := http.Client{
 		Timeout: timeout,

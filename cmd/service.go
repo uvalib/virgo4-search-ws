@@ -174,7 +174,7 @@ func getBearerToken(authorization string) (string, error) {
 }
 
 // Authenticate associates a user with an authorized session
-// (currently we just just ensure that an Authorization header was sent)
+// (currently we just just ensure that a bearer token was sent)
 func (svc *ServiceContext) Authenticate(c *gin.Context) {
 	token, err := getBearerToken(c.Request.Header.Get("Authorization"))
 
