@@ -1,7 +1,6 @@
 package main
 
 import (
-	"errors"
 	"fmt"
 	"log"
 	"net/http"
@@ -163,12 +162,29 @@ func (svc *ServiceContext) HealthCheck(c *gin.Context) {
 	c.JSON(http.StatusOK, hcMap)
 }
 
+func getBearerToken(authorization string) (string, error) {
+	components := strings.Split(strings.Join(strings.Fields(authorization), " "), " ")
+
+	// must have two components, the first of which is "Bearer", and the second a non-empty token
+	if len(components) != 2 || components[0] != "Bearer" || components[1] == "" {
+		return "", fmt.Errorf("Invalid Authorization header: [%s]", authorization)
+	}
+
+	return components[1], nil
+}
+
 // Authenticate associates a user with an authorized session
 // (currently we just just ensure that an Authorization header was sent)
 func (svc *ServiceContext) Authenticate(c *gin.Context) {
-	authorization := c.Request.Header.Get("Authorization")
+	token, err := getBearerToken(c.Request.Header.Get("Authorization"))
 
-	if authorization == "" {
-		c.AbortWithError(http.StatusUnauthorized, errors.New("Unauthorized"))
+	if err != nil {
+		log.Printf("Authentication failed: [%s]", err.Error())
+		c.AbortWithStatus(http.StatusUnauthorized)
+		return
 	}
+
+	// do something with token
+
+	log.Printf("got bearer token: [%s]", token)
 }
