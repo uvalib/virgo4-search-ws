@@ -45,9 +45,9 @@ func main() {
 	router.GET("/healthcheck", svc.HealthCheck)
 	api := router.Group("/api")
 	{
-		api.GET("/pools", svc.Authenticate, svc.GetPools)
-		api.POST("/pools/register", svc.Authenticate, svc.RegisterPool)
-		api.DELETE("/pools/register", svc.Authenticate, svc.DeRegisterPool)
+		api.GET("/pools", svc.GetPools)
+		api.POST("/pools/register", svc.RegisterPool)
+		api.DELETE("/pools/register", svc.DeRegisterPool)
 		api.POST("/search", svc.Authenticate, svc.Search)
 	}
 
