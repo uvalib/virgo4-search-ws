@@ -1,6 +1,7 @@
 package main
 
 import (
+	"errors"
 	"fmt"
 	"log"
 	"net/http"
@@ -160,4 +161,14 @@ func (svc *ServiceContext) HealthCheck(c *gin.Context) {
 		hcMap["redis"] = hcResp{Healthy: true}
 	}
 	c.JSON(http.StatusOK, hcMap)
+}
+
+// Authenticate associates a user with an authorized session
+// (currently we just just ensure that an Authorization header was sent)
+func (svc *ServiceContext) Authenticate(c *gin.Context) {
+	authorization := c.Request.Header.Get("Authorization")
+
+	if authorization == "" {
+		c.AbortWithError(http.StatusUnauthorized, errors.New("Unauthorized"))
+	}
 }

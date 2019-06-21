@@ -39,16 +39,16 @@ func main() {
 	p := ginprometheus.NewPrometheus("gin")
 	p.Use(router)
 
-	router.GET("/", svc.GetVersion)
-	router.GET("/favicon.ico", svc.IgnoreFavicon)
-	router.GET("/version", svc.GetVersion)
-	router.GET("/healthcheck", svc.HealthCheck)
+	router.GET("/", svc.Authenticate, svc.GetVersion)
+	router.GET("/favicon.ico", svc.Authenticate, svc.IgnoreFavicon)
+	router.GET("/version", svc.Authenticate, svc.GetVersion)
+	router.GET("/healthcheck", svc.Authenticate, svc.HealthCheck)
 	api := router.Group("/api")
 	{
-		api.GET("/pools", svc.GetPools)
-		api.POST("/pools/register", svc.RegisterPool)
-		api.DELETE("/pools/register", svc.DeRegisterPool)
-		api.POST("/search", svc.Search)
+		api.GET("/pools", svc.Authenticate, svc.GetPools)
+		api.POST("/pools/register", svc.Authenticate, svc.RegisterPool)
+		api.DELETE("/pools/register", svc.Authenticate, svc.DeRegisterPool)
+		api.POST("/search", svc.Authenticate, svc.Search)
 	}
 
 	portStr := fmt.Sprintf(":%d", cfg.Port)
