@@ -17,7 +17,8 @@ type Pool struct {
 	ID          string `json:"id"`
 	Name        string `json:"name"`
 	Description string `json:"description"`
-	URL         string `json:"url" binding:"required"`
+	URL         string `json:"-"` // private URL
+	PublicURL   string `json:"url"`
 	Alive       bool   `json:"alive"`
 }
 
@@ -45,12 +46,14 @@ func (p *Pool) Identify() bool {
 	type idResp struct {
 		Name        string `json:"name"`
 		Description string `json:"description"`
+		PublicURL   string `json:"public_url"`
 	}
 	var identity idResp
 	respTxt, _ := ioutil.ReadAll(resp.Body)
 	json.Unmarshal(respTxt, &identity)
 	p.Name = identity.Name
 	p.Description = identity.Description
+	p.PublicURL = identity.PublicURL
 	return true
 }
 
