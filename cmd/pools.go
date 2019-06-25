@@ -17,8 +17,8 @@ type Pool struct {
 	ID          string `json:"id"`
 	Name        string `json:"name"`
 	Description string `json:"description"`
-	URL         string `json:"-"` // private URL
-	PublicURL   string `json:"url"`
+	URL         string `json:"url"` // private URL
+	PublicURL   string `json:"-"`
 	Alive       bool   `json:"alive"`
 }
 
