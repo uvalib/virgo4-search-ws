@@ -2,7 +2,6 @@ package main
 
 import (
 	"fmt"
-	"io/ioutil"
 	"log"
 	"net/http"
 	"path/filepath"
@@ -64,8 +63,8 @@ func (svc *ServiceContext) Init(cfg *ServiceConfig) error {
 
 	if cfg.PoolsFile != "" {
 		log.Printf("Using dev mode pools file %s", cfg.PoolsFile)
-		data, _ := ioutil.ReadFile(cfg.PoolsFile)
-		# SPLIT ON \n init stuff
+		// /data, _ := ioutil.ReadFile(cfg.PoolsFile)
+		// # SPLIT ON \n init stuff
 	}
 
 	// // Notes on redis data:
