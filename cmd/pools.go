@@ -170,6 +170,7 @@ func (svc *ServiceContext) RegisterPool(c *gin.Context) {
 
 	// Grab some identify info from the pool API
 	pool.Identify()
+	log.Printf("Pool identified as %+v", pool)
 
 	// See if this pool already exists
 	isNew := true
@@ -199,6 +200,8 @@ func (svc *ServiceContext) RegisterPool(c *gin.Context) {
 		// 	return
 		// }
 		svc.Pools = append(svc.Pools, &pool)
+	} else {
+		log.Printf("Not new pool")
 	}
 
 	c.String(http.StatusOK, "registered")

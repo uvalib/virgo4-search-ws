@@ -21,7 +21,7 @@ func main() {
 	// Get config params; service port, directories, DB
 	cfg := ServiceConfig{}
 	cfg.Load()
-	svc := ServiceContext{Version: version}
+	svc := ServiceContext{Version: version, Pools: make([]*Pool, 0)}
 	err := svc.Init(&cfg)
 	if err != nil {
 		log.Fatalf("Unable to initialize service: %s", err.Error())
