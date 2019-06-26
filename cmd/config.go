@@ -13,6 +13,7 @@ type ServiceConfig struct {
 	RedisPrefix string
 	RedisDB     int
 	Port        int
+	PoolsFile   string
 }
 
 // Load will load the service configuration from env/cmdline
@@ -25,6 +26,7 @@ func (cfg *ServiceConfig) Load() {
 	flag.StringVar(&cfg.RedisPass, "redis_pass", "", "Redis password")
 	flag.StringVar(&cfg.RedisPrefix, "redis_prefix", "v4_pools", "Redis key prefix")
 	flag.IntVar(&cfg.RedisDB, "redis_db", 0, "Redis database instance")
+	flag.StringVar(&cfg.PoolsFile, "dev_pools", "", "Text file with a list of pools to use in dev env")
 
 	flag.Parse()
 
