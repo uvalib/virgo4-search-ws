@@ -166,9 +166,8 @@ func (svc *ServiceContext) RegisterPool(c *gin.Context) {
 		log.Printf("ERROR: New pool %s failed ping test", pool.PrivateURL)
 		c.String(http.StatusBadRequest, "Failed ping test")
 		return
-	} else {
-		log.Printf("Ping passed, try identify....")
 	}
+	log.Printf("Ping passed, try identify....")
 
 	// Grab some identify info from the pool API
 	pool.Identify()
@@ -177,6 +176,7 @@ func (svc *ServiceContext) RegisterPool(c *gin.Context) {
 	// See if this pool already exists
 	isNew := true
 	for _, p := range svc.Pools {
+		log.Printf("Checking if existing pool %+v matches %+v", p, pool)
 		if p.PrivateURL == pool.PrivateURL {
 			p.Alive = true
 			isNew = false

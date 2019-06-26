@@ -132,6 +132,7 @@ func (svc *ServiceContext) Init(cfg *ServiceConfig) error {
 // PingPools checks health of all attached pools and updates their status accordingly
 func (svc *ServiceContext) PingPools() {
 	errors := false
+	log.Printf("Checking %d pools for health", len(svc.Pools))
 	for _, p := range svc.Pools {
 		if err := p.Ping(); err != nil {
 			log.Printf("   * %s offline: %s", p.PrivateURL, err.Error())
