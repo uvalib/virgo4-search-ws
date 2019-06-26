@@ -13,12 +13,16 @@ import (
 )
 
 // Pool defines the attributes of a search pool
+// At registration, the pool sends its private URL. Next,
+// /identify is called to get the publicURL. Only the public
+// should be sent to client in json responses as 'url.
+// Private is omitted with json:"-"
 type Pool struct {
 	ID          string `json:"id"`
 	Name        string `json:"name"`
 	Description string `json:"description"`
-	URL         string `json:"url"` // private URL
-	PublicURL   string `json:"-"`
+	PrivateURL  string `json:"-"`
+	PublicURL   string `json:"url"`
 	Alive       bool   `json:"alive"`
 }
 
@@ -28,17 +32,17 @@ func (p *Pool) Identify() bool {
 	client := http.Client{
 		Timeout: timeout,
 	}
-	URL := fmt.Sprintf("%s/identify", p.URL)
+	URL := fmt.Sprintf("%s/identify", p.PrivateURL)
 	resp, err := client.Get(URL)
 	if err != nil {
-		log.Printf("ERROR: %s /identify failed: %s", p.URL, err.Error())
+		log.Printf("ERROR: %s /identify failed: %s", p.PrivateURL, err.Error())
 		p.Alive = false
 		return false
 	}
 
 	defer resp.Body.Close()
 	if resp.StatusCode != 200 {
-		log.Printf("   * FAIL: %s/identify returned bad status code : %d: ", p.URL, resp.StatusCode)
+		log.Printf("   * FAIL: %s/identify returned bad status code : %d: ", p.PrivateURL, resp.StatusCode)
 		p.Alive = false
 		return false
 	}
@@ -63,10 +67,10 @@ func (p *Pool) Ping() error {
 	client := http.Client{
 		Timeout: timeout,
 	}
-	hcURL := fmt.Sprintf("%s/healthcheck", p.URL)
+	hcURL := fmt.Sprintf("%s/healthcheck", p.PrivateURL)
 	resp, err := client.Get(hcURL)
 	if err != nil {
-		log.Printf("ERROR: %s ping failed: %s", p.URL, err.Error())
+		log.Printf("ERROR: %s ping failed: %s", p.PrivateURL, err.Error())
 		p.Alive = false
 		return err
 	}
@@ -74,13 +78,13 @@ func (p *Pool) Ping() error {
 	defer resp.Body.Close()
 	respTxt, _ := ioutil.ReadAll(resp.Body)
 	if resp.StatusCode != 200 {
-		log.Printf("   * FAIL: %s returned bad status code : %d: ", p.URL, resp.StatusCode)
+		log.Printf("   * FAIL: %s returned bad status code : %d: ", p.PrivateURL, resp.StatusCode)
 		p.Alive = false
 		return fmt.Errorf("%d:%s", resp.StatusCode, respTxt)
 	}
 
 	if strings.Contains(string(respTxt), "false") {
-		log.Printf("   * FAIL: %s has unhealthy components", p.URL)
+		log.Printf("   * FAIL: %s has unhealthy components", p.PrivateURL)
 		p.Alive = false
 		return fmt.Errorf("%s", respTxt)
 	}
@@ -110,7 +114,7 @@ func (svc *ServiceContext) DeRegisterPool(c *gin.Context) {
 	var delPool *Pool
 	poolIdx := -1
 	for idx, p := range svc.Pools {
-		if p.URL == tgtURL {
+		if p.PrivateURL == tgtURL || p.PublicURL == tgtURL {
 			delPool = p
 			poolIdx = idx
 			break
@@ -144,17 +148,22 @@ func (svc *ServiceContext) DeRegisterPool(c *gin.Context) {
 // RegisterPool is called by a pool. It will be added to the list of
 // pools that will be queried by  /search
 func (svc *ServiceContext) RegisterPool(c *gin.Context) {
-	var pool Pool
-	err := c.ShouldBindJSON(&pool)
+	type registration struct {
+		Name string
+		URL  string
+	}
+	var reg registration
+	err := c.ShouldBindJSON(&reg)
 	if err != nil {
 		log.Printf("ERROR: register failed - %s", err.Error())
 		c.String(http.StatusBadRequest, err.Error())
 		return
 	}
 
-	log.Printf("Received register for %+v", pool)
+	log.Printf("Received register for %+v", reg)
+	pool := Pool{Name: reg.Name, PrivateURL: reg.URL}
 	if err := pool.Ping(); err != nil {
-		log.Printf("ERROR: New pool %s failed ping test", pool.URL)
+		log.Printf("ERROR: New pool %s failed ping test", pool.PrivateURL)
 		c.String(http.StatusBadRequest, "Failed ping test")
 		return
 	}
@@ -165,7 +174,7 @@ func (svc *ServiceContext) RegisterPool(c *gin.Context) {
 	// See if this pool already exists
 	isNew := true
 	for _, p := range svc.Pools {
-		if p.URL == pool.URL {
+		if p.PrivateURL == pool.PrivateURL {
 			p.Alive = true
 			isNew = false
 			break
@@ -173,7 +182,7 @@ func (svc *ServiceContext) RegisterPool(c *gin.Context) {
 	}
 
 	if isNew == true {
-		log.Printf("Registering new pool %s", pool.URL)
+		log.Printf("Registering new pool %s", pool.PrivateURL)
 		poolIDKey := fmt.Sprintf("%s:next_pool_id", svc.RedisPrefix)
 		newID, err := svc.Redis.Incr(poolIDKey).Result()
 		if err != nil {
@@ -196,10 +205,7 @@ func (svc *ServiceContext) RegisterPool(c *gin.Context) {
 
 func (svc *ServiceContext) updateRedis(pool *Pool, newPool bool) error {
 	redisID := fmt.Sprintf("%s:pool:%s", svc.RedisPrefix, pool.ID)
-	_, err := svc.Redis.HMSet(redisID, map[string]interface{}{
-		"id":  pool.ID,
-		"url": pool.URL,
-	}).Result()
+	_, err := svc.Redis.Set(redisID, pool.PrivateURL, 0).Result()
 	if err != nil {
 		return err
 	}

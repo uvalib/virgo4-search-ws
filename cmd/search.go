@@ -62,6 +62,7 @@ type SearchPreferences struct {
 }
 
 // IsExcluded will return true if the target URL is included in the ExcludePools preferece
+// Note that the URL passed is always the Public URL, as this is the only one the client knows about
 func (p *SearchPreferences) IsExcluded(URL string) bool {
 	if URL == "" {
 		return false
@@ -189,7 +190,7 @@ func (svc *ServiceContext) Search(c *gin.Context) {
 
 	// headers to send to pool
 	headers := map[string]string{
-		"Content-Type": "application/json",
+		"Content-Type":  "application/json",
 		"Authorization": c.Request.Header.Get("Authorization"),
 	}
 
@@ -201,8 +202,11 @@ func (svc *ServiceContext) Search(c *gin.Context) {
 		if p.Alive == false {
 			continue
 		}
-		if req.Preferences.IsExcluded(p.URL) {
-			log.Printf("Skipping %s as it is part of the excluded URL list", p.URL)
+
+		// NOTE: the client only knows about publicURL so all excludes
+		// will be done with it as the key
+		if req.Preferences.IsExcluded(p.PublicURL) {
+			log.Printf("Skipping %s as it is part of the excluded URL list", p.PublicURL)
 			continue
 		}
 		outstandingRequests++
@@ -243,7 +247,8 @@ func (svc *ServiceContext) Search(c *gin.Context) {
 
 // Goroutine to do a pool search and return the PoolResults on the channel
 func searchPool(pool *Pool, req SearchRequest, qp SearchQP, headers map[string]string, channel chan AsyncResponse) {
-	sURL := fmt.Sprintf("%s/api/search?debug=%s&intuit=%s", pool.URL, qp.debug, qp.intuit)
+	// Master search always uses the Private URL to communicate with pools
+	sURL := fmt.Sprintf("%s/api/search?debug=%s&intuit=%s", pool.PrivateURL, qp.debug, qp.intuit)
 	log.Printf("POST search to %s", sURL)
 	respBytes, _ := json.Marshal(req)
 	postReq, _ := http.NewRequest("POST", sURL, bytes.NewBuffer(respBytes))
@@ -272,14 +277,14 @@ func searchPool(pool *Pool, req SearchRequest, qp SearchQP, headers map[string]s
 			errMsg = "system is offline"
 		}
 		pool.Alive = false
-		channel <- AsyncResponse{PoolURL: pool.URL, StatusCode: status, Message: errMsg}
+		channel <- AsyncResponse{PoolURL: pool.PrivateURL, StatusCode: status, Message: errMsg}
 		return
 	}
 	defer postResp.Body.Close()
 	bodyBytes, _ := ioutil.ReadAll(postResp.Body)
 
 	if postResp.StatusCode != 200 {
-		channel <- AsyncResponse{PoolURL: pool.URL, StatusCode: postResp.StatusCode, Message: string(bodyBytes)}
+		channel <- AsyncResponse{PoolURL: pool.PrivateURL, StatusCode: postResp.StatusCode, Message: string(bodyBytes)}
 		return
 	}
 
@@ -289,7 +294,7 @@ func searchPool(pool *Pool, req SearchRequest, qp SearchQP, headers map[string]s
 	err = json.Unmarshal(bodyBytes, &poolResp)
 	if err != nil {
 		log.Printf("ERROR: Unable to parse pool response: %s", err.Error())
-		channel <- AsyncResponse{PoolURL: pool.URL, StatusCode: http.StatusTeapot, Message: err.Error()}
+		channel <- AsyncResponse{PoolURL: pool.PrivateURL, StatusCode: http.StatusInternalServerError, Message: err.Error()}
 		return
 	}
 
@@ -300,5 +305,5 @@ func searchPool(pool *Pool, req SearchRequest, qp SearchQP, headers map[string]s
 	poolResp.Warnings = append(poolResp.Warnings, "POOL Test warning 1")
 	poolResp.Warnings = append(poolResp.Warnings, "POOL Test warning 2")
 	poolResp.Warnings = append(poolResp.Warnings, "POOL Test warning 3")
-	channel <- AsyncResponse{PoolURL: pool.URL, StatusCode: http.StatusOK, Results: &poolResp}
+	channel <- AsyncResponse{PoolURL: pool.PrivateURL, StatusCode: http.StatusOK, Results: &poolResp}
 }

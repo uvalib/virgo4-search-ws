@@ -21,13 +21,13 @@ type ServiceContext struct {
 }
 
 // IsPoolRegistered checks if a pool with the specified URL is registered
+// NOTE: This will check both public and private URLs to be sure
 func (svc *ServiceContext) IsPoolRegistered(url string) bool {
 	if url == "" {
 		return false
 	}
 	for _, pool := range svc.Pools {
-		log.Printf("Pool: %s:%t = tgt %s?", pool.URL, pool.Alive, url)
-		if pool.URL == url && pool.Alive {
+		if (pool.PrivateURL == url || pool.PublicURL == url) && pool.Alive {
 			log.Printf("   match")
 			return true
 		}
@@ -63,7 +63,7 @@ func (svc *ServiceContext) Init(cfg *ServiceConfig) error {
 
 	// Notes on redis data:
 	//   prefix:pools contains a list of IDs for each pool present
-	//   prefix:pool:[id] contains a hash with pool details; name and url
+	//   prefix:pool:[id]  contains the pool private url
 	//   prefix:next_pool_id is the next available ID for a new pool
 	// Get all of the pools IDs, iterate them to get details and
 	// establish connection / status
@@ -73,22 +73,22 @@ func (svc *ServiceContext) Init(cfg *ServiceConfig) error {
 	for _, poolID := range poolIDs {
 		redisID := fmt.Sprintf("%s:pool:%s", svc.RedisPrefix, poolID)
 		log.Printf("Get pool %s", redisID)
-		pInfo, poolErr := svc.Redis.HGetAll(redisID).Result()
+		privateURL, poolErr := svc.Redis.Get(redisID).Result()
 		if poolErr != nil {
 			log.Printf("ERROR: Unable to get info for pool %s:%s", redisID, poolErr.Error())
 			continue
 		}
-		log.Printf("Got %+v", pInfo)
+		log.Printf("Got %s", privateURL)
 
 		// create a and track a service; assume it is not alive by default
 		// ping  will test and update this alive status
-		pool := Pool{ID: poolID, URL: pInfo["url"], Alive: false}
+		pool := Pool{ID: poolID, PrivateURL: privateURL, Alive: false}
 		svc.Pools = append(svc.Pools, &pool)
-		log.Printf("Init %s...", pool.URL)
+		log.Printf("Init %s...", pool.PrivateURL)
 		if err := pool.Ping(); err != nil {
-			log.Printf("   * %s is not available: %s", pool.URL, err.Error())
+			log.Printf("   * %s is not available: %s", pool.PrivateURL, err.Error())
 		} else {
-			log.Printf("   * %s is alive", pool.URL)
+			log.Printf("   * %s is alive", pool.PrivateURL)
 			pool.Identify()
 		}
 	}
@@ -112,7 +112,7 @@ func (svc *ServiceContext) PingPools() {
 	errors := false
 	for _, p := range svc.Pools {
 		if err := p.Ping(); err != nil {
-			log.Printf("   * %s offline: %s", p.URL, err.Error())
+			log.Printf("   * %s offline: %s", p.PrivateURL, err.Error())
 			errors = true
 		}
 	}
@@ -149,9 +149,9 @@ func (svc *ServiceContext) HealthCheck(c *gin.Context) {
 	hcMap := make(map[string]hcResp)
 	for _, p := range svc.Pools {
 		if err := p.Ping(); err != nil {
-			hcMap[p.URL] = hcResp{Healthy: false, Message: err.Error()}
+			hcMap[p.PrivateURL] = hcResp{Healthy: false, Message: err.Error()}
 		} else {
-			hcMap[p.URL] = hcResp{Healthy: true}
+			hcMap[p.PrivateURL] = hcResp{Healthy: true}
 		}
 	}
 	if _, err := svc.Redis.Ping().Result(); err != nil {

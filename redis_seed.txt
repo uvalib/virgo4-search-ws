@@ -1,17 +1,17 @@
 incr V4_PREFIX:next_pool_id 
-hmset V4_PREFIX:pool:1 url "https://pool-solr-ws-catalog-dev.internal.lib.virginia.edu"
+set V4_PREFIX:pool:1 "http://pool-solr-ws-catalog.private.staging:8080.private.staging:8080"
 incr V4_PREFIX:next_pool_id 
-hmset V4_PREFIX:pool:2 url "https://pool-solr-ws-catalog-broad-dev.internal.lib.virginia.edu"
+set V4_PREFIX:pool:2 "http://pool-solr-ws-catalog-broad.private.staging:8080.private.staging:8080"
 incr V4_PREFIX:next_pool_id 
-hmset V4_PREFIX:pool:3 url "https://pool-solr-ws-video-dev.internal.lib.virginia.edu"
+set V4_PREFIX:pool:3 "http://pool-solr-ws-video.private.staging:8080.private.staging:8080"
 incr V4_PREFIX:next_pool_id 
-hmset V4_PREFIX:pool:4 url "https://pool-solr-ws-archival-dev.internal.lib.virginia.edu"
+set V4_PREFIX:pool:4 "http://pool-solr-ws-archival.private.staging:8080.private.staging:8080"
 incr V4_PREFIX:next_pool_id 
-hmset V4_PREFIX:pool:5 url "https://pool-solr-ws-serials-dev.internal.lib.virginia.edu"
+set V4_PREFIX:pool:5 "http://pool-solr-ws-serials.private.staging:8080"
 incr V4_PREFIX:next_pool_id 
-hmset V4_PREFIX:pool:6 url "https://pool-solr-ws-sound-recordings-dev.internal.lib.virginia.edu"
+set V4_PREFIX:pool:6 "http://pool-solr-ws-sound-recordings.private.staging:8080.private.staging:8080"
 incr V4_PREFIX:next_pool_id 
-hmset V4_PREFIX:pool:7 url "https://pool-solr-ws-musical-scores-dev.internal.lib.virginia.edu"
+set V4_PREFIX:pool:7 "http://pool-solr-ws-musical-scores.private.staging:8080.private.staging:8080"
 incr V4_PREFIX:next_pool_id 
-hmset V4_PREFIX:pool:8 url "https://pool-solr-ws-music-recordings-dev.internal.lib.virginia.edu"
+set V4_PREFIX:pool:8 "http://pool-solr-ws-music-recordings.private.staging:8080.private.staging:8080"
 sadd V4_PREFIX:pools 1 2 3 4 5 6 7 8 
