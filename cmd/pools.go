@@ -175,13 +175,24 @@ func (svc *ServiceContext) RegisterPool(c *gin.Context) {
 
 	// See if this pool already exists
 	isNew := true
-	for _, p := range svc.Pools {
-		log.Printf("Checking if existing pool %+v matches %+v", p, pool)
-		if p.PrivateURL == pool.PrivateURL {
-			p.Alive = true
-			isNew = false
-			break
+	if len(svc.Pools) > 0 {
+		log.Printf("There are pools registered, see if this is an update")
+		for _, p := range svc.Pools {
+			log.Printf("Checking if existing pool %+v matches %+v", p, pool)
+			if p.PrivateURL == pool.PrivateURL {
+				p.Alive = true
+				isNew = false
+				break
+			}
 		}
+	} else {
+		log.Printf("No pools registered. Add this one")
+		isNew = false
+		newID := len(svc.Pools) + 1
+		pool.ID = fmt.Sprintf("%d", newID)
+		svc.Pools = append(svc.Pools, &pool)
+		c.String(http.StatusOK, "registered")
+		return
 	}
 
 	if isNew == true {
