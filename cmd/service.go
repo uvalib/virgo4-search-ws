@@ -61,37 +61,38 @@ func (svc *ServiceContext) Init(cfg *ServiceConfig) error {
 		return err
 	}
 
-	// Notes on redis data:
-	//   prefix:pools contains a list of IDs for each pool present
-	//   prefix:pool:[id]  contains the pool private url
-	//   prefix:next_pool_id is the next available ID for a new pool
-	// Get all of the pools IDs, iterate them to get details and
-	// establish connection / status
-	poolKeys := fmt.Sprintf("%s:pools", svc.RedisPrefix)
-	log.Printf("Redis Connected; reading pools from %s", poolKeys)
-	poolIDs := svc.Redis.SMembers(poolKeys).Val()
-	for _, poolID := range poolIDs {
-		redisID := fmt.Sprintf("%s:pool:%s", svc.RedisPrefix, poolID)
-		log.Printf("Get pool %s", redisID)
-		privateURL, poolErr := svc.Redis.Get(redisID).Result()
-		if poolErr != nil {
-			log.Printf("ERROR: Unable to get info for pool %s:%s", redisID, poolErr.Error())
-			continue
-		}
-		log.Printf("Got %s", privateURL)
+	log.Printf("Not reading setup from redis")
+	// // Notes on redis data:
+	// //   prefix:pools contains a list of IDs for each pool present
+	// //   prefix:pool:[id]  contains the pool private url
+	// //   prefix:next_pool_id is the next available ID for a new pool
+	// // Get all of the pools IDs, iterate them to get details and
+	// // establish connection / status
+	// poolKeys := fmt.Sprintf("%s:pools", svc.RedisPrefix)
+	// log.Printf("Redis Connected; reading pools from %s", poolKeys)
+	// poolIDs := svc.Redis.SMembers(poolKeys).Val()
+	// for _, poolID := range poolIDs {
+	// 	redisID := fmt.Sprintf("%s:pool:%s", svc.RedisPrefix, poolID)
+	// 	log.Printf("Get pool %s", redisID)
+	// 	privateURL, poolErr := svc.Redis.Get(redisID).Result()
+	// 	if poolErr != nil {
+	// 		log.Printf("ERROR: Unable to get info for pool %s:%s", redisID, poolErr.Error())
+	// 		continue
+	// 	}
+	// 	log.Printf("Got %s", privateURL)
 
-		// create a and track a service; assume it is not alive by default
-		// ping  will test and update this alive status
-		pool := Pool{ID: poolID, PrivateURL: privateURL, Alive: false}
-		svc.Pools = append(svc.Pools, &pool)
-		log.Printf("Init %s...", pool.PrivateURL)
-		if err := pool.Ping(); err != nil {
-			log.Printf("   * %s is not available: %s", pool.PrivateURL, err.Error())
-		} else {
-			log.Printf("   * %s is alive", pool.PrivateURL)
-			pool.Identify()
-		}
-	}
+	// 	// create a and track a service; assume it is not alive by default
+	// 	// ping  will test and update this alive status
+	// 	pool := Pool{ID: poolID, PrivateURL: privateURL, Alive: false}
+	// 	svc.Pools = append(svc.Pools, &pool)
+	// 	log.Printf("Init %s...", pool.PrivateURL)
+	// 	if err := pool.Ping(); err != nil {
+	// 		log.Printf("   * %s is not available: %s", pool.PrivateURL, err.Error())
+	// 	} else {
+	// 		log.Printf("   * %s is alive", pool.PrivateURL)
+	// 		pool.Identify()
+	// 	}
+	// }
 
 	// Start a ticker to periodically poll pools and mark them
 	// active or inactive. The weird syntax puts the polling of
