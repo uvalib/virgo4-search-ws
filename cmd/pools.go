@@ -166,6 +166,8 @@ func (svc *ServiceContext) RegisterPool(c *gin.Context) {
 		log.Printf("ERROR: New pool %s failed ping test", pool.PrivateURL)
 		c.String(http.StatusBadRequest, "Failed ping test")
 		return
+	} else {
+		log.Printf("Ping passed, try identify....")
 	}
 
 	// Grab some identify info from the pool API

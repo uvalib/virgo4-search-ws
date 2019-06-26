@@ -1,7 +1,9 @@
 package main
 
 import (
+	"bufio"
 	"fmt"
+	"io/ioutil"
 	"log"
 	"net/http"
 	"path/filepath"
@@ -63,8 +65,22 @@ func (svc *ServiceContext) Init(cfg *ServiceConfig) error {
 
 	if cfg.PoolsFile != "" {
 		log.Printf("Using dev mode pools file %s", cfg.PoolsFile)
-		// /data, _ := ioutil.ReadFile(cfg.PoolsFile)
-		// # SPLIT ON \n init stuff
+		data, _ := ioutil.ReadFile(cfg.PoolsFile)
+		scanner := bufio.NewScanner(strings.NewReader(string(data)))
+		for scanner.Scan() {
+			svcURL := scanner.Text()
+			pool := Pool{PrivateURL: svcURL}
+			newID := len(svc.Pools) + 1
+			pool.ID = fmt.Sprintf("%d", newID)
+			if err := pool.Ping(); err != nil {
+				log.Printf("   * %s is not available: %s", pool.PrivateURL, err.Error())
+			} else {
+				log.Printf("   * %s is alive", pool.PrivateURL)
+				pool.Identify()
+				log.Printf("Pool identified as %+v", pool)
+				svc.Pools = append(svc.Pools, &pool)
+			}
+		}
 	}
 
 	// // Notes on redis data:
