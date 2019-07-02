@@ -19,7 +19,7 @@ import (
 type Pagination struct {
 	Start int `json:"start"`
 	Rows  int `json:"rows"`
-	Total int `json:"total,omitempty"`
+	Total int `json:"total"`
 }
 
 // PoolResult is the response from a single pool
