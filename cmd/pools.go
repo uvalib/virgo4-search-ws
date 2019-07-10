@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bufio"
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
@@ -9,6 +10,9 @@ import (
 	"strings"
 	"time"
 
+	"github.com/aws/aws-sdk-go/aws"
+	"github.com/aws/aws-sdk-go/service/dynamodb"
+	"github.com/aws/aws-sdk-go/service/dynamodb/dynamodbattribute"
 	"github.com/gin-gonic/gin"
 )
 
@@ -98,139 +102,124 @@ func (svc *ServiceContext) GetPools(c *gin.Context) {
 	if len(svc.Pools) == 0 {
 		c.JSON(http.StatusOK, make([]*Pool, 0, 1))
 	} else {
-		c.JSON(http.StatusOK, svc.Pools)
+		// only return those pools that are listed as alive.
+		// others have errors and are not currently in use
+		active := make([]*Pool, 0)
+		for _, p := range svc.Pools {
+			if p.Alive {
+				active = append(active, p)
+			}
+		}
+		c.JSON(http.StatusOK, active)
 	}
 }
 
-// DeRegisterPool will remove a pool by URL passed in the request
-func (svc *ServiceContext) DeRegisterPool(c *gin.Context) {
-	tgtURL := c.Query("url")
-	if tgtURL == "" {
-		log.Printf("ERROR: missing url param")
-		c.String(http.StatusBadRequest, "Missing required url param")
-		return
-	}
+// RegisterPool is now deprecated. No-Op, then delete when pools
+// have been updated
+func (svc *ServiceContext) RegisterPool(c *gin.Context) {
+	c.String(http.StatusOK, "no-op")
+}
 
-	var delPool *Pool
-	poolIdx := -1
-	for idx, p := range svc.Pools {
-		if p.PrivateURL == tgtURL || p.PublicURL == tgtURL {
-			delPool = p
-			poolIdx = idx
-			break
+// PingPools checks health of all attached pools and updates their status accordingly
+func (svc *ServiceContext) PingPools() {
+	log.Printf("Checking %d pools for health", len(svc.Pools))
+	for _, p := range svc.Pools {
+		if err := p.Ping(); err != nil {
+			log.Printf("   * %s offline: %s", p.PrivateURL, err.Error())
 		}
 	}
-	if delPool == nil {
-		log.Printf("ERROR: %s is not registered", tgtURL)
-		c.String(http.StatusBadRequest, "%s is not registered", tgtURL)
-		return
-	}
-
-	redisID := fmt.Sprintf("%s:pool:%s", svc.RedisPrefix, delPool.ID)
-	_, err := svc.Redis.Del(redisID).Result()
-	if err != nil {
-		log.Printf("ERROR: Unable to delete %s : %s", tgtURL, err.Error())
-		c.String(http.StatusInternalServerError, err.Error())
-		return
-	}
-
-	servicesKey := fmt.Sprintf("%s:pools", svc.RedisPrefix)
-	_, err = svc.Redis.SRem(servicesKey, delPool.ID).Result()
-	if err != nil {
-		log.Printf("ERROR: Unable to delete pool ID for %s : %s", tgtURL, err.Error())
-		c.String(http.StatusInternalServerError, err.Error())
-		return
-	}
-	svc.Pools = append(svc.Pools[:poolIdx], svc.Pools[poolIdx+1:]...)
-	c.String(http.StatusOK, "unregistered %s", tgtURL)
 }
 
-// RegisterPool is called by a pool. It will be added to the list of
-// pools that will be queried by  /search
-func (svc *ServiceContext) RegisterPool(c *gin.Context) {
-	type registration struct {
-		Name string
-		URL  string
+// PoolExists checks if a pool with the given URL exists
+func (svc *ServiceContext) PoolExists(url string) bool {
+	for _, p := range svc.Pools {
+		if p.PrivateURL == url || p.PublicURL == url {
+			return true
+		}
 	}
-	var reg registration
-	err := c.ShouldBindJSON(&reg)
+	return false
+}
+
+// UpdateAuthoritativePools fetches a list of current pools from a DynamoDB. New pools
+// will be added to an in-memory cache. If an existing pool is not found in the
+// list, it will be removed from service.
+func (svc *ServiceContext) UpdateAuthoritativePools() {
+	log.Printf("Scanning for pool updates in %s", svc.PoolsTable)
+	params := dynamodb.ScanInput{
+		TableName: aws.String(svc.PoolsTable),
+	}
+	result, err := svc.DynamoDB.Scan(&params)
 	if err != nil {
-		log.Printf("ERROR: register failed - %s", err.Error())
-		c.String(http.StatusBadRequest, err.Error())
+		log.Printf("ERROR: Unable to retrieve pools from AWS: %v", err)
 		return
 	}
 
-	log.Printf("Received register for %+v", reg)
-	pool := Pool{Name: reg.Name, PrivateURL: reg.URL}
-	if err := pool.Ping(); err != nil {
-		log.Printf("ERROR: New pool %s failed ping test", pool.PrivateURL)
-		c.String(http.StatusBadRequest, "Failed ping test")
-		return
+	// NOTE: This structure matches the only attribute value in the DynamoDB table
+	type Item struct {
+		URL string
 	}
-	log.Printf("Ping passed, try identify....")
+	var authoritativeURLs []string
+	for idx, ddbItem := range result.Items {
+		item := Item{}
+		err = dynamodbattribute.UnmarshalMap(ddbItem, &item)
+		if err != nil {
+			log.Printf("Unable to read DDB item %v: %v", ddbItem, err)
+		} else {
+			authoritativeURLs = append(authoritativeURLs, item.URL)
+			if svc.PoolExists(item.URL) {
+				// pool already exists; no nothing
+				continue
+			}
+			pool := Pool{ID: fmt.Sprintf("%d", idx+1), PrivateURL: item.URL}
+			if err := pool.Ping(); err != nil {
+				log.Printf("   * %s is not available: %s", pool.PrivateURL, err.Error())
+			} else {
+				if pool.Identify() {
+					log.Printf("   * %s is alive and identified %s", pool.PrivateURL, pool.Name)
+					svc.Pools = append(svc.Pools, &pool)
+				} else {
+					log.Printf("   * %s is alive, but failed identify. Skipping", pool.PrivateURL)
+				}
+			}
+		}
+	}
 
-	// Grab some identify info from the pool API
-	pool.Identify()
-	log.Printf("Pool identified as %+v", pool)
-
-	// See if this pool already exists
-	isNew := true
-	if len(svc.Pools) > 0 {
-		log.Printf("There are pools registered, see if this is an update")
-		for _, p := range svc.Pools {
-			log.Printf("Checking if existing pool %+v matches %+v", p, pool)
-			if p.PrivateURL == pool.PrivateURL {
-				p.Alive = true
-				isNew = false
+	// Now see if there are any pools in memory that are no longer in the
+	// authoritatve list, they have been retired and should be dropped
+	for idx := len(svc.Pools) - 1; idx >= 0; idx-- {
+		p := svc.Pools[idx]
+		found := false
+		for _, authURL := range authoritativeURLs {
+			if authURL == p.PrivateURL || authURL == p.PublicURL {
+				found = true
 				break
 			}
 		}
-	} else {
-		log.Printf("No pools registered. Add this one")
-		isNew = false
-		newID := len(svc.Pools) + 1
-		pool.ID = fmt.Sprintf("%d", newID)
-		svc.Pools = append(svc.Pools, &pool)
-		c.String(http.StatusOK, "registered")
-		return
+		if found == false {
+			log.Printf("Pool %s:%s is no longer on the authoritative list. Removing", p.Name, p.PrivateURL)
+			svc.Pools = append(svc.Pools[:idx], svc.Pools[idx+1:]...)
+		}
 	}
-
-	if isNew == true {
-		log.Printf("Registering new pool %s", pool.PrivateURL)
-		// poolIDKey := fmt.Sprintf("%s:next_pool_id", svc.RedisPrefix)
-		// newID, err := svc.Redis.Incr(poolIDKey).Result()
-		// if err != nil {
-		// 	log.Printf("ERROR: Unable to get ID new service: %s", err.Error())
-		// 	c.String(http.StatusInternalServerError, err.Error())
-		// 	return
-		// }
-		newID := len(svc.Pools) + 1
-		pool.ID = fmt.Sprintf("%d", newID)
-		// redisErr := svc.updateRedis(&pool, true)
-		// if redisErr != nil {
-		// 	log.Printf("Unable to get update redis %s", redisErr.Error())
-		// 	c.String(http.StatusInternalServerError, redisErr.Error())
-		// 	return
-		// }
-		svc.Pools = append(svc.Pools, &pool)
-	} else {
-		log.Printf("Not new pool")
-	}
-
-	c.String(http.StatusOK, "registered")
 }
 
-// func (svc *ServiceContext) updateRedis(pool *Pool, newPool bool) error {
-// 	redisID := fmt.Sprintf("%s:pool:%s", svc.RedisPrefix, pool.ID)
-// 	_, err := svc.Redis.Set(redisID, pool.PrivateURL, 0).Result()
-// 	if err != nil {
-// 		return err
-// 	}
-
-// 	// This is a new pool.. add the ID to *:pools
-// 	if newPool {
-// 		servicesKey := fmt.Sprintf("%s:pools", svc.RedisPrefix)
-// 		_, err = svc.Redis.SAdd(servicesKey, pool.ID).Result()
-// 	}
-// 	return err
-// }
+// LoadDevPools is only used in local development mode. It will fetch a static list of
+// pools from a text file. These pools will be pinged for health, but not updated.
+func (svc *ServiceContext) LoadDevPools(cfgFile string) {
+	log.Printf("Using dev mode pools file %s", cfgFile)
+	data, _ := ioutil.ReadFile(cfgFile)
+	scanner := bufio.NewScanner(strings.NewReader(string(data)))
+	for scanner.Scan() {
+		svcURL := scanner.Text()
+		pool := Pool{PrivateURL: svcURL}
+		newID := len(svc.Pools) + 1
+		pool.ID = fmt.Sprintf("%d", newID)
+		if err := pool.Ping(); err != nil {
+			log.Printf("   * %s is not available: %s", pool.PrivateURL, err.Error())
+		} else {
+			log.Printf("   * %s is alive", pool.PrivateURL)
+			pool.Identify()
+			log.Printf("Pool identified as %+v", pool)
+			svc.Pools = append(svc.Pools, &pool)
+		}
+	}
+}

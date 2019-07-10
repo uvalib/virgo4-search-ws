@@ -102,8 +102,11 @@ type SearchResponse struct {
 // NewSearchResponse creates a new instance of a search response initialized
 // with a requet and a blank debug map
 func NewSearchResponse(req *SearchRequest) *SearchResponse {
-	return &SearchResponse{Request: req, Results: make([]*PoolResult, 0),
-		Debug: make(map[string]interface{})}
+	return &SearchResponse{Request: req,
+		Results:  make([]*PoolResult, 0),
+		Debug:    make(map[string]interface{}),
+		Warnings: make([]string, 0, 0),
+	}
 }
 
 // AsyncResponse is a wrapper around the data returned on a channel from the
@@ -175,6 +178,10 @@ func (svc *ServiceContext) Search(c *gin.Context) {
 		return
 	}
 
+	// Just before each search, check the authoritative pool list
+	// and see if any new pools have been added, or pools have been retired.
+	start := time.Now()
+	svc.UpdateAuthoritativePools()
 	if len(svc.Pools) == 0 {
 		log.Printf("WARNING: No search pools registered")
 		out.Warnings = append(out.Warnings, "No pools registered")
@@ -195,7 +202,6 @@ func (svc *ServiceContext) Search(c *gin.Context) {
 	}
 
 	// Kick off all pool requests in parallel and wait for all to respond
-	start := time.Now()
 	channel := make(chan AsyncResponse)
 	outstandingRequests := 0
 	for _, p := range svc.Pools {
@@ -234,13 +240,6 @@ func (svc *ServiceContext) Search(c *gin.Context) {
 	// Total time for all respones (basically the longest response)
 	elapsedNanoSec := time.Since(start)
 	out.TotalTimeMS = int64(elapsedNanoSec / time.Millisecond)
-
-	out.Warnings = append(out.Warnings, "Test warning 1")
-	out.Warnings = append(out.Warnings, "Test warning 2")
-	out.Warnings = append(out.Warnings, "Test warning 3")
-	out.Debug["debug_test1"] = 101
-	out.Debug["debug_test2"] = "test string"
-	out.Debug["debug_test3"] = 239.769
 
 	c.JSON(http.StatusOK, out)
 }
@@ -301,9 +300,5 @@ func searchPool(pool *Pool, req SearchRequest, qp SearchQP, headers map[string]s
 	// Add elapsed time and stick it in the master search results format
 	poolResp.ElapsedMS = elapsedMS
 
-	// Test warnings
-	poolResp.Warnings = append(poolResp.Warnings, "POOL Test warning 1")
-	poolResp.Warnings = append(poolResp.Warnings, "POOL Test warning 2")
-	poolResp.Warnings = append(poolResp.Warnings, "POOL Test warning 3")
 	channel <- AsyncResponse{PoolURL: pool.PrivateURL, StatusCode: http.StatusOK, Results: &poolResp}
 }

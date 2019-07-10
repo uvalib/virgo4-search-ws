@@ -1,25 +1,26 @@
 package main
 
 import (
-	"bufio"
 	"fmt"
-	"io/ioutil"
 	"log"
 	"net/http"
 	"path/filepath"
 	"strings"
 	"time"
 
+	"github.com/aws/aws-sdk-go/aws"
+	"github.com/aws/aws-sdk-go/aws/credentials"
+	"github.com/aws/aws-sdk-go/aws/session"
+	"github.com/aws/aws-sdk-go/service/dynamodb"
 	"github.com/gin-gonic/gin"
-	"github.com/go-redis/redis"
 )
 
 // ServiceContext contains common data used by all handlers
 type ServiceContext struct {
-	Version     string
-	RedisPrefix string
-	Redis       *redis.Client
-	Pools       []*Pool
+	Version    string
+	PoolsTable string
+	DynamoDB   *dynamodb.DynamoDB
+	Pools      []*Pool
 }
 
 // IsPoolRegistered checks if a pool with the specified URL is registered
@@ -41,83 +42,23 @@ func (svc *ServiceContext) IsPoolRegistered(url string) bool {
 // pools found in redis will be added to the context and polled for status
 func (svc *ServiceContext) Init(cfg *ServiceConfig) error {
 	log.Printf("Initializing Service...")
-	redisHost := fmt.Sprintf("%s:%d", cfg.RedisHost, cfg.RedisPort)
-	log.Printf("Connect to redis instance at %s", redisHost)
-	svc.RedisPrefix = cfg.RedisPrefix
-	redisOpts := redis.Options{
-		Addr: redisHost,
-		DB:   cfg.RedisDB,
-	}
-	if cfg.RedisPass != "" {
-		redisOpts.Password = cfg.RedisPass
-		log.Printf("Connecting to redis DB %d with a password", cfg.RedisDB)
-	} else {
-		redisOpts.Password = ""
-		log.Printf("Connecting to redis DB %d without a password", cfg.RedisDB)
-	}
-	svc.Redis = redis.NewClient(&redisOpts)
-
-	// See if the connection is good...
-	_, err := svc.Redis.Ping().Result()
-	if err != nil {
-		return err
-	}
-
 	if cfg.PoolsFile != "" {
-		log.Printf("Using dev mode pools file %s", cfg.PoolsFile)
-		data, _ := ioutil.ReadFile(cfg.PoolsFile)
-		scanner := bufio.NewScanner(strings.NewReader(string(data)))
-		for scanner.Scan() {
-			svcURL := scanner.Text()
-			pool := Pool{PrivateURL: svcURL}
-			newID := len(svc.Pools) + 1
-			pool.ID = fmt.Sprintf("%d", newID)
-			if err := pool.Ping(); err != nil {
-				log.Printf("   * %s is not available: %s", pool.PrivateURL, err.Error())
-			} else {
-				log.Printf("   * %s is alive", pool.PrivateURL)
-				pool.Identify()
-				log.Printf("Pool identified as %+v", pool)
-				svc.Pools = append(svc.Pools, &pool)
-			}
-		}
+		svc.LoadDevPools(cfg.PoolsFile)
+	} else {
+		log.Printf("Init AWS DynamoDB Session")
+		sess := session.Must(session.NewSession(&aws.Config{
+			Region:      aws.String(cfg.AWSRegion),
+			Credentials: credentials.NewStaticCredentials(cfg.AWSAccessKey, cfg.AWSSecretKey, ""),
+		}))
+		svc.DynamoDB = dynamodb.New(sess)
+		svc.PoolsTable = cfg.DynamoDBTable
+		svc.UpdateAuthoritativePools()
 	}
-
-	// // Notes on redis data:
-	// //   prefix:pools contains a list of IDs for each pool present
-	// //   prefix:pool:[id]  contains the pool private url
-	// //   prefix:next_pool_id is the next available ID for a new pool
-	// // Get all of the pools IDs, iterate them to get details and
-	// // establish connection / status
-	// poolKeys := fmt.Sprintf("%s:pools", svc.RedisPrefix)
-	// log.Printf("Redis Connected; reading pools from %s", poolKeys)
-	// poolIDs := svc.Redis.SMembers(poolKeys).Val()
-	// for _, poolID := range poolIDs {
-	// 	redisID := fmt.Sprintf("%s:pool:%s", svc.RedisPrefix, poolID)
-	// 	log.Printf("Get pool %s", redisID)
-	// 	privateURL, poolErr := svc.Redis.Get(redisID).Result()
-	// 	if poolErr != nil {
-	// 		log.Printf("ERROR: Unable to get info for pool %s:%s", redisID, poolErr.Error())
-	// 		continue
-	// 	}
-	// 	log.Printf("Got %s", privateURL)
-
-	// 	// create a and track a service; assume it is not alive by default
-	// 	// ping  will test and update this alive status
-	// 	pool := Pool{ID: poolID, PrivateURL: privateURL, Alive: false}
-	// 	svc.Pools = append(svc.Pools, &pool)
-	// 	log.Printf("Init %s...", pool.PrivateURL)
-	// 	if err := pool.Ping(); err != nil {
-	// 		log.Printf("   * %s is not available: %s", pool.PrivateURL, err.Error())
-	// 	} else {
-	// 		log.Printf("   * %s is alive", pool.PrivateURL)
-	// 		pool.Identify()
-	// 	}
-	// }
 
 	// Start a ticker to periodically poll pools and mark them
 	// active or inactive. The weird syntax puts the polling of
 	// the ticker channel an a goroutine so it doesn't block
+	log.Printf("Start pool hearbeat ticker")
 	ticker := time.NewTicker(time.Minute)
 	go func() {
 		for range ticker.C {
@@ -127,21 +68,6 @@ func (svc *ServiceContext) Init(cfg *ServiceConfig) error {
 	}()
 
 	return nil
-}
-
-// PingPools checks health of all attached pools and updates their status accordingly
-func (svc *ServiceContext) PingPools() {
-	errors := false
-	log.Printf("Checking %d pools for health", len(svc.Pools))
-	for _, p := range svc.Pools {
-		if err := p.Ping(); err != nil {
-			log.Printf("   * %s offline: %s", p.PrivateURL, err.Error())
-			errors = true
-		}
-	}
-	if errors == false {
-		log.Printf("   * All services online")
-	}
 }
 
 // IgnoreFavicon is a dummy to handle browser favicon requests without warnings
@@ -176,11 +102,6 @@ func (svc *ServiceContext) HealthCheck(c *gin.Context) {
 		} else {
 			hcMap[p.PrivateURL] = hcResp{Healthy: true}
 		}
-	}
-	if _, err := svc.Redis.Ping().Result(); err != nil {
-		hcMap["redis"] = hcResp{Healthy: false, Message: err.Error()}
-	} else {
-		hcMap["redis"] = hcResp{Healthy: true}
 	}
 	c.JSON(http.StatusOK, hcMap)
 }

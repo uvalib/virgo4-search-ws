@@ -1,0 +1,53 @@
+# NOTES:
+# All this info can be found here: https://console.aws.amazon.com/route53/home?#hosted-zones:
+#   * internal.lib.virginia.edu - lists all (dev and prod) of the PUBLIC urls for services
+#   * private.staging - lists all of the PRIVATE DEV urls
+#   * private.production - lists all of the PIVATE PROD urls 
+
+# ====================================================================================
+# DEV INSTANCES
+# ====================================================================================
+
+# PRIVATE INTERFACES
+http://pool-solr-ws-catalog.private.staging:8080
+http://pool-solr-ws-catalog-broad.private.staging:8080
+http://pool-solr-ws-video.private.staging:8080
+http://pool-solr-ws-archival.private.staging:8080
+http://pool-solr-ws-serials.private.staging:8080
+http://pool-solr-ws-sound-recordings.private.staging:8080
+http://pool-solr-ws-musical-scores.private.staging:8080
+http://pool-solr-ws-music-recordings.private.staging:8080
+
+# PUBLIC INTERFACES
+https://pool-solr-ws-catalog-dev.internal.lib.virginia.edu
+https://pool-solr-ws-catalog-broad-dev.internal.lib.virginia.edu
+https://pool-solr-ws-video-dev.internal.lib.virginia.edu
+https://pool-solr-ws-archival-dev.internal.lib.virginia.edu
+https://pool-solr-ws-serials-dev.internal.lib.virginia.edu
+https://pool-solr-ws-sound-recordings-dev.internal.lib.virginia.edu
+https://pool-solr-ws-musical-scores-dev.internal.lib.virginia.edu
+https://pool-solr-ws-music-recordings-dev.internal.lib.virginia.edu
+
+# ====================================================================================
+# PROD INSTANCES
+# ====================================================================================
+
+# PRIVATE INTERFACES
+http://pool-solr-ws-catalog.private.production:8080
+http://pool-solr-ws-catalog-broad.private.production:8080
+http://pool-solr-ws-video.private.production:8080
+http://pool-solr-ws-archival.private.production:8080
+http://pool-solr-ws-serials.private.production:8080
+http://pool-solr-ws-sound-recordings.private.production:8080
+http://pool-solr-ws-musical-scores.private.production:8080
+http://pool-solr-ws-music-recordings.private.production:8080
+
+# PUBLIC INTERFACES
+https://pool-solr-ws-catalog.internal.lib.virginia.edu
+https://pool-solr-ws-catalog-broad.internal.lib.virginia.edu
+https://pool-solr-ws-video.internal.lib.virginia.edu
+https://pool-solr-ws-archival.internal.lib.virginia.edu
+https://pool-solr-ws-serials.internal.lib.virginia.edu
+https://pool-solr-ws-sound-recordings.internal.lib.virginia.edu
+https://pool-solr-ws-musical-scores.internal.lib.virginia.edu
+https://pool-solr-ws-music-recordings.internal.lib.virginia.edu

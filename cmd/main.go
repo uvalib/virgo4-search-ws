@@ -47,7 +47,6 @@ func main() {
 	{
 		api.GET("/pools", svc.GetPools)
 		api.POST("/pools/register", svc.RegisterPool)
-		api.DELETE("/pools/register", svc.DeRegisterPool)
 		api.POST("/search", svc.Authenticate, svc.Search)
 	}
 
