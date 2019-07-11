@@ -48,8 +48,7 @@ func (svc *ServiceContext) Init(cfg *ServiceConfig) error {
 		if cfg.AWSAccessKey == "" {
 			log.Printf("Init AWS DynamoDB Session using AWS role")
 			sess := session.Must(session.NewSession(&aws.Config{
-				Region:      aws.String(cfg.AWSRegion),
-				Credentials: credentials.NewStaticCredentials(cfg.AWSAccessKey, cfg.AWSSecretKey, ""),
+				Region: aws.String(cfg.AWSRegion),
 			}))
 			svc.DynamoDB = dynamodb.New(sess)
 		} else {
