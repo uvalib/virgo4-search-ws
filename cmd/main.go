@@ -46,7 +46,6 @@ func main() {
 	api := router.Group("/api")
 	{
 		api.GET("/pools", svc.GetPools)
-		api.POST("/pools/register", svc.RegisterPool)
 		api.POST("/search", svc.Authenticate, svc.Search)
 	}
 

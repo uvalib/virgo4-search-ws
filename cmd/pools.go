@@ -114,12 +114,6 @@ func (svc *ServiceContext) GetPools(c *gin.Context) {
 	}
 }
 
-// RegisterPool is now deprecated. No-Op, then delete when pools
-// have been updated
-func (svc *ServiceContext) RegisterPool(c *gin.Context) {
-	c.String(http.StatusOK, "no-op")
-}
-
 // PingPools checks health of all attached pools and updates their status accordingly
 func (svc *ServiceContext) PingPools() {
 	log.Printf("Checking %d pools for health", len(svc.Pools))
