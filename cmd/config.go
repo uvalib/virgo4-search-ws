@@ -23,7 +23,7 @@ func (cfg *ServiceConfig) Load() {
 	flag.StringVar(&cfg.AWSAccessKey, "aws_access", "", "AWS Access Key")
 	flag.StringVar(&cfg.AWSSecretKey, "aws_secret", "", "AWS Secret Key")
 	flag.StringVar(&cfg.AWSRegion, "aws_region", "us-east-1", "AWS region")
-	flag.StringVar(&cfg.DynamoDBTable, "ddb_table", "V4SearchPools", "DynamDB table name")
+	flag.StringVar(&cfg.DynamoDBTable, "ddb_table", "V4SearchPools", "DynamoDB table name")
 	flag.StringVar(&cfg.PoolsFile, "dev_pools", "", "Text file with a list of pools to use in dev env")
 
 	flag.Parse()
