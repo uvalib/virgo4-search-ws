@@ -143,7 +143,7 @@ func (svc *ServiceContext) PoolExists(url string) bool {
 // UpdateAuthoritativePools fetches a list of current pools from a DynamoDB. New pools
 // will be added to an in-memory cache. If an existing pool is not found in the
 // list, it will be removed from service.
-func (svc *ServiceContext) UpdateAuthoritativePools() {
+func (svc *ServiceContext) UpdateAuthoritativePools() error {
 	log.Printf("Scanning for pool updates in %s", svc.PoolsTable)
 	params := dynamodb.ScanInput{
 		TableName: aws.String(svc.PoolsTable),
@@ -151,7 +151,7 @@ func (svc *ServiceContext) UpdateAuthoritativePools() {
 	result, err := svc.DynamoDB.Scan(&params)
 	if err != nil {
 		log.Printf("ERROR: Unable to retrieve pools from AWS: %v", err)
-		return
+		return err
 	}
 
 	// NOTE: This structure matches the only attribute value in the DynamoDB table
@@ -200,6 +200,7 @@ func (svc *ServiceContext) UpdateAuthoritativePools() {
 			svc.Pools = append(svc.Pools[:idx], svc.Pools[idx+1:]...)
 		}
 	}
+	return nil
 }
 
 // LoadDevPools is only used in local development mode. It will fetch a static list of

@@ -29,10 +29,6 @@ func (cfg *ServiceConfig) Load() {
 	flag.Parse()
 
 	// if anything is still not set, die
-	if (cfg.AWSAccessKey == "" || cfg.AWSSecretKey == "") && cfg.PoolsFile == "" {
-		flag.Usage()
-		log.Fatal("FATAL: Missing AWS configuration or local dev configuration")
-	}
 	if cfg.AWSAccessKey != "" && cfg.PoolsFile != "" {
 		log.Fatal("FATAL: Specify AWS config or dev config, not both")
 	}

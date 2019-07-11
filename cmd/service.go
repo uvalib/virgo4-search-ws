@@ -45,14 +45,26 @@ func (svc *ServiceContext) Init(cfg *ServiceConfig) error {
 	if cfg.PoolsFile != "" {
 		svc.LoadDevPools(cfg.PoolsFile)
 	} else {
-		log.Printf("Init AWS DynamoDB Session")
-		sess := session.Must(session.NewSession(&aws.Config{
-			Region:      aws.String(cfg.AWSRegion),
-			Credentials: credentials.NewStaticCredentials(cfg.AWSAccessKey, cfg.AWSSecretKey, ""),
-		}))
-		svc.DynamoDB = dynamodb.New(sess)
+		if cfg.AWSAccessKey == "" {
+			log.Printf("Init AWS DynamoDB Session using AWS role")
+			sess := session.Must(session.NewSession(&aws.Config{
+				Region:      aws.String(cfg.AWSRegion),
+				Credentials: credentials.NewStaticCredentials(cfg.AWSAccessKey, cfg.AWSSecretKey, ""),
+			}))
+			svc.DynamoDB = dynamodb.New(sess)
+		} else {
+			log.Printf("Init AWS DynamoDB Session using passed keys")
+			sess := session.Must(session.NewSession(&aws.Config{
+				Region:      aws.String(cfg.AWSRegion),
+				Credentials: credentials.NewStaticCredentials(cfg.AWSAccessKey, cfg.AWSSecretKey, ""),
+			}))
+			svc.DynamoDB = dynamodb.New(sess)
+		}
 		svc.PoolsTable = cfg.DynamoDBTable
-		svc.UpdateAuthoritativePools()
+		err := svc.UpdateAuthoritativePools()
+		if err != nil {
+			return err
+		}
 	}
 
 	// Start a ticker to periodically poll pools and mark them
