@@ -4,6 +4,11 @@
 #   * private.staging - lists all of the PRIVATE DEV urls
 #   * private.production - lists all of the PIVATE PROD urls 
 
+# DynamoDB instances
+#  virgo4-pools-staging
+#  virgo4-pools-production
+# The test table create for local development V4PoolsTest still stands
+
 # ====================================================================================
 # DEV INSTANCES
 # ====================================================================================
