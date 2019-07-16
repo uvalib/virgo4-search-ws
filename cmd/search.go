@@ -181,11 +181,13 @@ func (svc *ServiceContext) Search(c *gin.Context) {
 	// Just before each search, check the authoritative pool list
 	// and see if any new pools have been added, or pools have been retired.
 	start := time.Now()
+	log.Printf("Pre-search, pre-update pools count %d", len(svc.Pools))
 	svc.UpdateAuthoritativePools()
 	if len(svc.Pools) == 0 {
 		log.Printf("WARNING: No search pools registered")
 		out.Warnings = append(out.Warnings, "No pools registered")
 	}
+	log.Printf("Pre-search, post-update pools count %d", len(svc.Pools))
 
 	if req.Preferences.TargetPool != "" && svc.IsPoolRegistered(req.Preferences.TargetPool) == false {
 		log.Printf("WARNING: Target Pool %s is not registered", req.Preferences.TargetPool)

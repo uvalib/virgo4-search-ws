@@ -164,6 +164,7 @@ func (svc *ServiceContext) UpdateAuthoritativePools() error {
 				// pool already exists; no nothing
 				continue
 			}
+			log.Printf("Authoritative pools update found new pool URL %s", item.URL)
 			pool := Pool{ID: fmt.Sprintf("%d", idx+1), PrivateURL: item.URL}
 			if err := pool.Ping(); err != nil {
 				log.Printf("   * %s is not available: %s", pool.PrivateURL, err.Error())
