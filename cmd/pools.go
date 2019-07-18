@@ -25,7 +25,7 @@ type Pool struct {
 	Description string `json:"description"`
 	PrivateURL  string `json:"-"`
 	PublicURL   string `json:"url"`
-	Alive       bool   `json:"alive"`
+	Alive       bool   `json:"-"`
 }
 
 // Identify will call the pool /identify endpoint to get full pool details.

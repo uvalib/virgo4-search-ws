@@ -90,13 +90,13 @@ type SearchQP struct {
 
 // SearchResponse contains all search resonse data
 type SearchResponse struct {
-	Request       *SearchRequest         `json:"request"`
-	PoolsSearched int                    `json:"pools_searched"`
-	TotalTimeMS   int64                  `json:"total_time_ms"`
-	TotalHits     int                    `json:"total_hits"`
-	Results       []*PoolResult          `json:"pool_results"`
-	Debug         map[string]interface{} `json:"debug"`
-	Warnings      []string               `json:"warnings"`
+	Request     *SearchRequest         `json:"request"`
+	Pools       []*Pool                `json:"pools"`
+	TotalTimeMS int64                  `json:"total_time_ms"`
+	TotalHits   int                    `json:"total_hits"`
+	Results     []*PoolResult          `json:"pool_results"`
+	Debug       map[string]interface{} `json:"debug"`
+	Warnings    []string               `json:"warnings"`
 }
 
 // NewSearchResponse creates a new instance of a search response initialized
@@ -162,6 +162,11 @@ func (svc *ServiceContext) Search(c *gin.Context) {
 	}
 	log.Printf("Search Request %+v", req)
 	out := NewSearchResponse(&req)
+	for _, p := range svc.Pools {
+		if p.Alive {
+			out.Pools = append(out.Pools, p)
+		}
+	}
 
 	valid, errors := v4parser.Validate(req.Query)
 	if valid == false {
@@ -220,7 +225,6 @@ func (svc *ServiceContext) Search(c *gin.Context) {
 			continue
 		}
 		outstandingRequests++
-		out.PoolsSearched++
 		go searchPool(p, req, qp, headers, channel)
 	}
 
@@ -233,6 +237,7 @@ func (svc *ServiceContext) Search(c *gin.Context) {
 		} else {
 			log.Printf("ERROR: %s returned %d:%s", asyncResult.PoolURL,
 				asyncResult.StatusCode, asyncResult.Message)
+			out.Warnings = append(out.Warnings, asyncResult.Message)
 		}
 		outstandingRequests--
 	}
@@ -260,7 +265,7 @@ func searchPool(pool *Pool, req SearchRequest, qp SearchQP, headers map[string]s
 		postReq.Header.Set(name, val)
 	}
 
-	timeout := time.Duration(15 * time.Second)
+	timeout := time.Duration(5 * time.Second)
 	client := http.Client{
 		Timeout: timeout,
 	}
@@ -274,10 +279,10 @@ func searchPool(pool *Pool, req SearchRequest, qp SearchQP, headers map[string]s
 		errMsg := err.Error()
 		if strings.Contains(err.Error(), "Timeout") {
 			status = http.StatusRequestTimeout
-			errMsg = "request timed out"
+			errMsg = fmt.Sprintf("%s search timed out", pool.Name)
 		} else if strings.Contains(err.Error(), "connection refused") {
 			status = http.StatusServiceUnavailable
-			errMsg = "system is offline"
+			errMsg = fmt.Sprintf("%s is offline", pool.Name)
 		}
 		pool.Alive = false
 		channel <- AsyncResponse{PoolURL: pool.PrivateURL, StatusCode: status, Message: errMsg}
@@ -292,12 +297,12 @@ func searchPool(pool *Pool, req SearchRequest, qp SearchQP, headers map[string]s
 	}
 
 	log.Printf("Successful pool response from %s. Elapsed Time: %dms", sURL, elapsedMS)
-	log.Printf("RESPONSE: %s", string(bodyBytes))
 	var poolResp PoolResult
 	err = json.Unmarshal(bodyBytes, &poolResp)
 	if err != nil {
 		log.Printf("ERROR: Unable to parse pool response: %s", err.Error())
-		channel <- AsyncResponse{PoolURL: pool.PrivateURL, StatusCode: http.StatusInternalServerError, Message: err.Error()}
+		msg := fmt.Sprintf("%s returned invalid search response", pool.Name)
+		channel <- AsyncResponse{PoolURL: pool.PrivateURL, StatusCode: http.StatusInternalServerError, Message: msg}
 		return
 	}
 
