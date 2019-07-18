@@ -17,25 +17,11 @@ import (
 
 // ServiceContext contains common data used by all handlers
 type ServiceContext struct {
-	Version    string
-	PoolsTable string
-	DynamoDB   *dynamodb.DynamoDB
-	Pools      []*Pool
-}
-
-// IsPoolRegistered checks if a pool with the specified URL is registered
-// NOTE: This will check both public and private URLs to be sure
-func (svc *ServiceContext) IsPoolRegistered(url string) bool {
-	if url == "" {
-		return false
-	}
-	for _, pool := range svc.Pools {
-		if (pool.PrivateURL == url || pool.PublicURL == url) && pool.Alive {
-			log.Printf("   match")
-			return true
-		}
-	}
-	return false
+	Version      string
+	PoolsTable   string
+	DevPoolsFile string
+	DynamoDB     *dynamodb.DynamoDB
+	Pools        []*Pool
 }
 
 // Init will initialize the service context based on the config parameters. Any
@@ -43,7 +29,8 @@ func (svc *ServiceContext) IsPoolRegistered(url string) bool {
 func (svc *ServiceContext) Init(cfg *ServiceConfig) error {
 	log.Printf("Initializing Service...")
 	if cfg.PoolsFile != "" {
-		svc.LoadDevPools(cfg.PoolsFile)
+		svc.DevPoolsFile = cfg.PoolsFile
+		svc.LoadDevPools()
 	} else {
 		if cfg.AWSAccessKey == "" {
 			log.Printf("Init AWS DynamoDB Session using AWS role")
@@ -73,8 +60,12 @@ func (svc *ServiceContext) Init(cfg *ServiceConfig) error {
 	ticker := time.NewTicker(time.Minute)
 	go func() {
 		for range ticker.C {
-			log.Printf("Pool check heartbeat")
-			svc.PingPools()
+			log.Printf("Pool check heartbeat; checking %d pools.", len(svc.Pools))
+			for _, p := range svc.Pools {
+				if err := p.Ping(); err != nil {
+					log.Printf("   * %s failed ping: %s", p.PrivateURL, err.Error())
+				}
+			}
 		}
 	}()
 
@@ -102,19 +93,29 @@ func (svc *ServiceContext) GetVersion(c *gin.Context) {
 
 // HealthCheck reports the health of the serivce
 func (svc *ServiceContext) HealthCheck(c *gin.Context) {
+	if len(svc.Pools) == 0 {
+		c.String(http.StatusInternalServerError, "No pools registered")
+		return
+	}
 	type hcResp struct {
 		Healthy bool   `json:"healthy"`
 		Message string `json:"message,omitempty"`
 	}
 	hcMap := make(map[string]hcResp)
+	healthyCount := 0
 	for _, p := range svc.Pools {
 		if err := p.Ping(); err != nil {
 			hcMap[p.PrivateURL] = hcResp{Healthy: false, Message: err.Error()}
 		} else {
 			hcMap[p.PrivateURL] = hcResp{Healthy: true}
+			healthyCount++
 		}
 	}
-	c.JSON(http.StatusOK, hcMap)
+	if healthyCount == 0 {
+		c.String(http.StatusInternalServerError, fmt.Sprintf("%d pools registered, all report errors.", len(svc.Pools)))
+	} else {
+		c.JSON(http.StatusOK, hcMap)
+	}
 }
 
 func getBearerToken(authorization string) (string, error) {

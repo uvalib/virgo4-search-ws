@@ -189,7 +189,7 @@ func (svc *ServiceContext) Search(c *gin.Context) {
 	}
 	log.Printf("Pre-search, post-update pools count %d", len(svc.Pools))
 
-	if req.Preferences.TargetPool != "" && svc.IsPoolRegistered(req.Preferences.TargetPool) == false {
+	if req.Preferences.TargetPool != "" && svc.IsPoolActive(req.Preferences.TargetPool) == false {
 		log.Printf("WARNING: Target Pool %s is not registered", req.Preferences.TargetPool)
 		out.Warnings = append(out.Warnings, "Target pool is not active")
 	}
@@ -198,9 +198,11 @@ func (svc *ServiceContext) Search(c *gin.Context) {
 	qp := SearchQP{debug: c.Query("debug"), intuit: c.Query("intuit")}
 
 	// headers to send to pool
+	authToken := c.Request.Header.Get("Authorization")
+	log.Printf("Search auth token %s", authToken)
 	headers := map[string]string{
 		"Content-Type":  "application/json",
-		"Authorization": c.Request.Header.Get("Authorization"),
+		"Authorization": authToken,
 	}
 
 	// Kick off all pool requests in parallel and wait for all to respond

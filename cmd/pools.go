@@ -16,11 +16,9 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-// Pool defines the attributes of a search pool
-// At registration, the pool sends its private URL. Next,
-// /identify is called to get the publicURL. Only the public
-// should be sent to client in json responses as 'url.
-// Private is omitted with json:"-"
+// Pool defines the attributes of a search pool. Pools are initially registered
+// with on the ProvateURL. Full details are read from the /identify endpoint.
+// PrivateURL should not be sent to client in json responses.
 type Pool struct {
 	ID          string `json:"id"`
 	Name        string `json:"name"`
@@ -30,7 +28,7 @@ type Pool struct {
 	Alive       bool   `json:"alive"`
 }
 
-// Identify will call the pool /identify endpoint and add descriptive info to the pool
+// Identify will call the pool /identify endpoint to get full pool details.
 func (p *Pool) Identify() bool {
 	timeout := time.Duration(5 * time.Second)
 	client := http.Client{
@@ -114,20 +112,20 @@ func (svc *ServiceContext) GetPools(c *gin.Context) {
 	}
 }
 
-// PingPools checks health of all attached pools and updates their status accordingly
-func (svc *ServiceContext) PingPools() {
-	log.Printf("Checking %d pools for health", len(svc.Pools))
-	for _, p := range svc.Pools {
-		if err := p.Ping(); err != nil {
-			log.Printf("   * %s offline: %s", p.PrivateURL, err.Error())
-		}
-	}
-}
-
-// PoolExists checks if a pool with the given URL exists
+// PoolExists checks if a pool with the given URL exists, regardless of the current status.
 func (svc *ServiceContext) PoolExists(url string) bool {
 	for _, p := range svc.Pools {
 		if p.PrivateURL == url || p.PublicURL == url {
+			return true
+		}
+	}
+	return false
+}
+
+// IsPoolActive checks if a pool with the specified URL is registered and alive
+func (svc *ServiceContext) IsPoolActive(url string) bool {
+	for _, pool := range svc.Pools {
+		if (pool.PrivateURL == url || pool.PublicURL == url) && pool.Alive {
 			return true
 		}
 	}
@@ -138,6 +136,10 @@ func (svc *ServiceContext) PoolExists(url string) bool {
 // will be added to an in-memory cache. If an existing pool is not found in the
 // list, it will be removed from service.
 func (svc *ServiceContext) UpdateAuthoritativePools() error {
+	if svc.DevPoolsFile != "" {
+		svc.LoadDevPools()
+		return nil
+	}
 	log.Printf("Scanning for pool updates in %s", svc.PoolsTable)
 	params := dynamodb.ScanInput{
 		TableName: aws.String(svc.PoolsTable),
@@ -166,21 +168,56 @@ func (svc *ServiceContext) UpdateAuthoritativePools() error {
 			}
 			log.Printf("Authoritative pools update found new pool URL %s", item.URL)
 			pool := Pool{ID: fmt.Sprintf("%d", idx+1), PrivateURL: item.URL}
-			if err := pool.Ping(); err != nil {
-				log.Printf("   * %s is not available: %s", pool.PrivateURL, err.Error())
-			} else {
-				if pool.Identify() {
-					log.Printf("   * %s is alive and identified %s", pool.PrivateURL, pool.Name)
-					svc.Pools = append(svc.Pools, &pool)
-				} else {
-					log.Printf("   * %s is alive, but failed identify. Skipping", pool.PrivateURL)
-				}
-			}
+			svc.AddPool(pool)
 		}
 	}
 
 	// Now see if there are any pools in memory that are no longer in the
 	// authoritatve list, they have been retired and should be dropped
+	svc.PrunePools(authoritativeURLs)
+	return nil
+}
+
+// LoadDevPools is only used in local development mode. It will fetch a static list of
+// pools from a text file. These pools will be pinged for health, but not updated.
+func (svc *ServiceContext) LoadDevPools() {
+	log.Printf("Load pools from dev mode pools file %s", svc.DevPoolsFile)
+	data, _ := ioutil.ReadFile(svc.DevPoolsFile)
+	scanner := bufio.NewScanner(strings.NewReader(string(data)))
+	var authoritativeURLs []string
+	for scanner.Scan() {
+		svcURL := scanner.Text()
+		authoritativeURLs = append(authoritativeURLs, svcURL)
+		if svc.PoolExists(svcURL) {
+			continue
+		}
+		log.Printf("Authoritative pools update found new pool URL %s", svcURL)
+		pool := Pool{PrivateURL: svcURL}
+		newID := len(svc.Pools) + 1
+		pool.ID = fmt.Sprintf("%d", newID)
+		svc.AddPool(pool)
+	}
+	svc.PrunePools(authoritativeURLs)
+}
+
+// AddPool will ping and identify a new pool. If both are successful, the pool as added to the in-memory
+// list of available pools.
+func (svc *ServiceContext) AddPool(pool Pool) {
+	if err := pool.Ping(); err != nil {
+		log.Printf("   * %s is not available: %s", pool.PrivateURL, err.Error())
+	} else {
+		if pool.Identify() {
+			log.Printf("   * %s is alive and identified %s", pool.PrivateURL, pool.Name)
+			svc.Pools = append(svc.Pools, &pool)
+		} else {
+			log.Printf("   * %s is alive, but failed identify. Skipping", pool.PrivateURL)
+		}
+	}
+}
+
+// PrunePools compares the in-memory pools with the authoritative pool list. Any
+// pools that are not on the authoritative list are removed.
+func (svc *ServiceContext) PrunePools(authoritativeURLs []string) {
 	for idx := len(svc.Pools) - 1; idx >= 0; idx-- {
 		p := svc.Pools[idx]
 		found := false
@@ -193,29 +230,6 @@ func (svc *ServiceContext) UpdateAuthoritativePools() error {
 		if found == false {
 			log.Printf("Pool %s:%s is no longer on the authoritative list. Removing", p.Name, p.PrivateURL)
 			svc.Pools = append(svc.Pools[:idx], svc.Pools[idx+1:]...)
-		}
-	}
-	return nil
-}
-
-// LoadDevPools is only used in local development mode. It will fetch a static list of
-// pools from a text file. These pools will be pinged for health, but not updated.
-func (svc *ServiceContext) LoadDevPools(cfgFile string) {
-	log.Printf("Using dev mode pools file %s", cfgFile)
-	data, _ := ioutil.ReadFile(cfgFile)
-	scanner := bufio.NewScanner(strings.NewReader(string(data)))
-	for scanner.Scan() {
-		svcURL := scanner.Text()
-		pool := Pool{PrivateURL: svcURL}
-		newID := len(svc.Pools) + 1
-		pool.ID = fmt.Sprintf("%d", newID)
-		if err := pool.Ping(); err != nil {
-			log.Printf("   * %s is not available: %s", pool.PrivateURL, err.Error())
-		} else {
-			log.Printf("   * %s is alive", pool.PrivateURL)
-			pool.Identify()
-			log.Printf("Pool identified as %+v", pool)
-			svc.Pools = append(svc.Pools, &pool)
 		}
 	}
 }
