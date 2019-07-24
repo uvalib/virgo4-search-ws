@@ -248,7 +248,10 @@ func (svc *ServiceContext) Search(c *gin.Context) {
 
 	// Total time for all respones (basically the longest response)
 	elapsedNanoSec := time.Since(start)
-	out.TotalTimeMS = int64(elapsedNanoSec / time.Millisecond)
+	elapsedMS := int64(elapsedNanoSec / time.Millisecond)
+	out.TotalTimeMS = elapsedMS
+
+	log.Printf("Received all pool responses. Elapsed Time: %d (ms)", elapsedMS)
 
 	c.JSON(http.StatusOK, out)
 }
@@ -296,7 +299,7 @@ func searchPool(pool *Pool, req SearchRequest, qp SearchQP, headers map[string]s
 		return
 	}
 
-	log.Printf("Successful pool response from %s. Elapsed Time: %dms", sURL, elapsedMS)
+	log.Printf("Successful pool response from %s. Elapsed Time: %d (ms)", sURL, elapsedMS)
 	var poolResp PoolResult
 	err = json.Unmarshal(bodyBytes, &poolResp)
 	if err != nil {
