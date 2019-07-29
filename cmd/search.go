@@ -15,6 +15,42 @@ import (
 	"github.com/uvalib/virgo4-parser/v4parser"
 )
 
+// SearchRequest contains all of the data necessary for a client seatch request
+type SearchRequest struct {
+	Query       string             `json:"query"`
+	Pagination  *Pagination        `json:"pagination"`
+	Facet       string             `json:"facet"`
+	Filters     []*VirgoFacet      `json:"filters"`
+	Preferences *SearchPreferences `json:"preferences"`
+}
+
+// SearchResponse contains all search resonse data
+type SearchResponse struct {
+	Request     *SearchRequest         `json:"request"`
+	Pools       []*Pool                `json:"pools"`
+	TotalTimeMS int64                  `json:"total_time_ms"`
+	TotalHits   int                    `json:"total_hits"`
+	Results     []*PoolResult          `json:"pool_results"`
+	Debug       map[string]interface{} `json:"debug"`
+	Warnings    []string               `json:"warnings"`
+}
+
+// NewSearchResponse creates a new instance of a search response initialized
+// with a request and a blank debug map
+func NewSearchResponse(req *SearchRequest) *SearchResponse {
+	return &SearchResponse{Request: req,
+		Results:  make([]*PoolResult, 0),
+		Debug:    make(map[string]interface{}),
+		Warnings: make([]string, 0, 0),
+	}
+}
+
+// SearchQP defines the query params that could be passed to the pools
+type SearchQP struct {
+	debug  string
+	intuit string
+}
+
 // Pagination cantains pagination info
 type Pagination struct {
 	Start int `json:"start"`
@@ -24,13 +60,48 @@ type Pagination struct {
 
 // PoolResult is the response from a single pool
 type PoolResult struct {
-	ServiceURL string                 `json:"service_url"`
-	ElapsedMS  int64                  `json:"elapsed_ms,omitempty"`
-	Pagination *Pagination            `json:"pagination"`
-	Records    []*Record              `json:"record_list"`
-	Confidence string                 `json:"confidence,omitempty"`
-	Debug      map[string]interface{} `json:"debug"`
-	Warnings   []string               `json:"warnings"`
+	ServiceURL      string                 `json:"service_url"`
+	ElapsedMS       int64                  `json:"elapsed_ms,omitempty"`
+	Pagination      *Pagination            `json:"pagination"`
+	Records         []*Record              `json:"record_list"`
+	AvailableFacets *[]string              `json:"available_facets,omitempty"` // available facets advertised to the client
+	FacetList       []*VirgoFacet          `json:"facet_list,omitempty"`       // facet values for client-requested facets
+	Confidence      string                 `json:"confidence,omitempty"`
+	Debug           map[string]interface{} `json:"debug"`
+	Warnings        []string               `json:"warnings"`
+}
+
+// VirgoFacet contains the fields for a single facet.
+type VirgoFacet struct {
+	Name    string             `json:"name"`
+	Buckets []VirgoFacetBucket `json:"buckets"`
+}
+
+// VirgoFacetBucket contains the fields for an individual bucket for a facet.
+type VirgoFacetBucket struct {
+	Value string `json:"value"`
+	Count int    `json:"count"`
+}
+
+// Record is a summary of one search hit
+type Record struct {
+	Fields []RecordField          `json:"fields"`
+	Debug  map[string]interface{} `json:"debug"`
+}
+
+// RecordField contains metadata for a single field in a record.
+type RecordField struct {
+	Name       string `json:"name"`
+	Type       string `json:"type,omitempty"` // assume simple string if not provided
+	Label      string `json:"label,omitempty"`
+	Value      string `json:"value,omitempty"`
+	Visibility string `json:"visibility,omitempty"` // e.g. "basic" or "detailed"
+}
+
+// SearchPreferences contains preferences for the search
+type SearchPreferences struct {
+	TargetPool   string   `json:"target_pool"`
+	ExcludePools []string `json:"exclude_pool"`
 }
 
 // ConfidenceIndex will convert a string confidence into a numeric value
@@ -46,21 +117,6 @@ func (pr *PoolResult) ConfidenceIndex() int {
 	return 0
 }
 
-// Record is a summary of one search hit
-type Record struct {
-	ID       string                 `json:"id"`
-	Title    string                 `json:"title"`
-	Subtitle string                 `json:"subtitle"`
-	Author   string                 `json:"author"`
-	Debug    map[string]interface{} `json:"debug"`
-}
-
-// SearchPreferences contains preferences for the search
-type SearchPreferences struct {
-	TargetPool   string   `json:"target_pool"`
-	ExcludePools []string `json:"exclude_pool"`
-}
-
 // IsExcluded will return true if the target URL is included in the ExcludePools preferece
 // Note that the URL passed is always the Public URL, as this is the only one the client knows about
 func (p *SearchPreferences) IsExcluded(URL string) bool {
@@ -73,40 +129,6 @@ func (p *SearchPreferences) IsExcluded(URL string) bool {
 		}
 	}
 	return false
-}
-
-// SearchRequest contains all of the data necessary for a client seatch request
-type SearchRequest struct {
-	Query       string             `json:"query"`
-	Pagination  *Pagination        `json:"pagination"`
-	Preferences *SearchPreferences `json:"preferences"`
-}
-
-// SearchQP defines the query params that should be passed to the pools
-type SearchQP struct {
-	debug  string
-	intuit string
-}
-
-// SearchResponse contains all search resonse data
-type SearchResponse struct {
-	Request     *SearchRequest         `json:"request"`
-	Pools       []*Pool                `json:"pools"`
-	TotalTimeMS int64                  `json:"total_time_ms"`
-	TotalHits   int                    `json:"total_hits"`
-	Results     []*PoolResult          `json:"pool_results"`
-	Debug       map[string]interface{} `json:"debug"`
-	Warnings    []string               `json:"warnings"`
-}
-
-// NewSearchResponse creates a new instance of a search response initialized
-// with a requet and a blank debug map
-func NewSearchResponse(req *SearchRequest) *SearchResponse {
-	return &SearchResponse{Request: req,
-		Results:  make([]*PoolResult, 0),
-		Debug:    make(map[string]interface{}),
-		Warnings: make([]string, 0, 0),
-	}
 }
 
 // AsyncResponse is a wrapper around the data returned on a channel from the
@@ -204,7 +226,6 @@ func (svc *ServiceContext) Search(c *gin.Context) {
 
 	// headers to send to pool
 	authToken := c.Request.Header.Get("Authorization")
-	log.Printf("Search auth token %s", authToken)
 	headers := map[string]string{
 		"Content-Type":  "application/json",
 		"Authorization": authToken,

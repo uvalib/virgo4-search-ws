@@ -12,3 +12,4 @@ dist/
 env.*
 /pkg
 run.sh
+curls.txt
