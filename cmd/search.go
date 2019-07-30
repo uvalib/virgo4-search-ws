@@ -17,11 +17,17 @@ import (
 
 // SearchRequest contains all of the data necessary for a client seatch request
 type SearchRequest struct {
-	Query       string             `json:"query"`
-	Pagination  *Pagination        `json:"pagination"`
-	Facet       string             `json:"facet"`
-	Filters     []*VirgoFacet      `json:"filters"`
-	Preferences *SearchPreferences `json:"preferences"`
+	Query       string            `json:"query"`
+	Pagination  Pagination        `json:"pagination"`
+	Facet       string            `json:"facet"`
+	Filters     []VirgoFilter     `json:"filters"`
+	Preferences SearchPreferences `json:"preferences"`
+}
+
+// VirgoFilter contains the fields for a single filter.
+type VirgoFilter struct {
+	Name  string `json:"name"`
+	Value string `json:"value"`
 }
 
 // SearchResponse contains all search resonse data
@@ -62,10 +68,10 @@ type Pagination struct {
 type PoolResult struct {
 	ServiceURL      string                 `json:"service_url"`
 	ElapsedMS       int64                  `json:"elapsed_ms,omitempty"`
-	Pagination      *Pagination            `json:"pagination"`
-	Records         []*Record              `json:"record_list"`
-	AvailableFacets *[]string              `json:"available_facets,omitempty"` // available facets advertised to the client
-	FacetList       []*VirgoFacet          `json:"facet_list,omitempty"`       // facet values for client-requested facets
+	Pagination      Pagination             `json:"pagination"`
+	Records         []Record               `json:"record_list"`
+	AvailableFacets []string               `json:"available_facets,omitempty"` // available facets advertised to the client
+	FacetList       []VirgoFacet           `json:"facet_list,omitempty"`       // facet values for client-requested facets
 	Confidence      string                 `json:"confidence,omitempty"`
 	Debug           map[string]interface{} `json:"debug"`
 	Warnings        []string               `json:"warnings"`
@@ -92,10 +98,10 @@ type Record struct {
 // RecordField contains metadata for a single field in a record.
 type RecordField struct {
 	Name       string `json:"name"`
-	Type       string `json:"type,omitempty"` // assume simple string if not provided
-	Label      string `json:"label,omitempty"`
-	Value      string `json:"value,omitempty"`
-	Visibility string `json:"visibility,omitempty"` // e.g. "basic" or "detailed"
+	Type       string `json:"type"` // assume simple string if not provided
+	Label      string `json:"label"`
+	Value      string `json:"value"`
+	Visibility string `json:"visibility"` // e.g. "basic" or "detailed"
 }
 
 // SearchPreferences contains preferences for the search
