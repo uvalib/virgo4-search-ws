@@ -65,7 +65,7 @@ func (p *Pool) Identify() bool {
 
 // Ping will check the health of a pool by calling /healthcheck and looking for good status
 func (p *Pool) Ping() error {
-	timeout := time.Duration(5 * time.Second)
+	timeout := time.Duration(500 * time.Millisecond)
 	client := http.Client{
 		Timeout: timeout,
 	}

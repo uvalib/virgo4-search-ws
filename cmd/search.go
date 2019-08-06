@@ -24,37 +24,34 @@ type SearchRequest struct {
 	Preferences SearchPreferences `json:"preferences"`
 }
 
+// SearchQP defines the query params that could be passed to the pools
+type SearchQP struct {
+	debug  string
+	intuit string
+}
+
 // VirgoFilter contains the fields for a single filter.
 type VirgoFilter struct {
 	Name  string `json:"name"`
 	Value string `json:"value"`
 }
 
-// SearchResponse contains all search resonse data
-type SearchResponse struct {
-	Request     *SearchRequest         `json:"request"`
-	Pools       []*Pool                `json:"pools"`
-	TotalTimeMS int64                  `json:"total_time_ms"`
-	TotalHits   int                    `json:"total_hits"`
-	Results     []*PoolResult          `json:"pool_results"`
-	Debug       map[string]interface{} `json:"debug"`
-	Warnings    []string               `json:"warnings"`
-}
-
-// NewSearchResponse creates a new instance of a search response initialized
-// with a request and a blank debug map
+// NewSearchResponse creates a new instance of a search response
 func NewSearchResponse(req *SearchRequest) *SearchResponse {
 	return &SearchResponse{Request: req,
 		Results:  make([]*PoolResult, 0),
-		Debug:    make(map[string]interface{}),
 		Warnings: make([]string, 0, 0),
 	}
 }
 
-// SearchQP defines the query params that could be passed to the pools
-type SearchQP struct {
-	debug  string
-	intuit string
+// SearchResponse contains all search resonse data
+type SearchResponse struct {
+	Request     *SearchRequest `json:"request"`
+	Pools       []*Pool        `json:"pools"`
+	TotalTimeMS int64          `json:"total_time_ms"`
+	TotalHits   int            `json:"total_hits"`
+	Results     []*PoolResult  `json:"pool_results"`
+	Warnings    []string       `json:"warnings"`
 }
 
 // Pagination cantains pagination info
@@ -70,11 +67,13 @@ type PoolResult struct {
 	ElapsedMS       int64                  `json:"elapsed_ms,omitempty"`
 	Pagination      Pagination             `json:"pagination"`
 	Records         []Record               `json:"record_list"`
-	AvailableFacets []string               `json:"available_facets,omitempty"` // available facets advertised to the client
-	FacetList       []VirgoFacet           `json:"facet_list,omitempty"`       // facet values for client-requested facets
+	AvailableFacets []string               `json:"available_facets"`     // available facets advertised to the client
+	FacetList       []VirgoFacet           `json:"facet_list,omitempty"` // facet values for client-requested facets
 	Confidence      string                 `json:"confidence,omitempty"`
 	Debug           map[string]interface{} `json:"debug"`
 	Warnings        []string               `json:"warnings"`
+	StatusCode      int                    `json:"status_code"`
+	StatusMessage   string                 `json:"status_msg,omitempty"`
 }
 
 // VirgoFacet contains the fields for a single facet.
@@ -137,15 +136,6 @@ func (p *SearchPreferences) IsExcluded(URL string) bool {
 	return false
 }
 
-// AsyncResponse is a wrapper around the data returned on a channel from the
-// goroutine that gets search results from a pool
-type AsyncResponse struct {
-	PoolURL    string
-	StatusCode int
-	Message    string
-	Results    *PoolResult
-}
-
 // byConfidence will sort responses by confidence, then hit count
 // If a target pool is specified, it will put that one first
 type byConfidence struct {
@@ -202,7 +192,6 @@ func (svc *ServiceContext) Search(c *gin.Context) {
 		c.String(http.StatusBadRequest, errors)
 		return
 	}
-	log.Printf("Query is valid")
 
 	// see if target pool is also in exclude list
 	if req.Preferences.TargetPool != "" && req.Preferences.IsExcluded(req.Preferences.TargetPool) {
@@ -217,8 +206,9 @@ func (svc *ServiceContext) Search(c *gin.Context) {
 	log.Printf("Pre-search, pre-update pools count %d", len(svc.Pools))
 	svc.UpdateAuthoritativePools()
 	if len(svc.Pools) == 0 {
-		log.Printf("WARNING: No search pools registered")
-		out.Warnings = append(out.Warnings, "No pools registered")
+		log.Printf("ERROR: No search pools registered")
+		c.String(http.StatusInternalServerError, "No search pools available")
+		return
 	}
 	log.Printf("Pre-search, post-update pools count %d", len(svc.Pools))
 
@@ -238,11 +228,14 @@ func (svc *ServiceContext) Search(c *gin.Context) {
 	}
 
 	// Kick off all pool requests in parallel and wait for all to respond
-	channel := make(chan AsyncResponse)
+	channel := make(chan PoolResult)
 	outstandingRequests := 0
 	for _, p := range svc.Pools {
 		if p.Alive == false {
-			continue
+			if p.Ping() != nil {
+				log.Printf("Skipping %s as it is not alive", p.PublicURL)
+				continue
+			}
 		}
 
 		// NOTE: the client only knows about publicURL so all excludes
@@ -257,14 +250,16 @@ func (svc *ServiceContext) Search(c *gin.Context) {
 
 	// wait for all to be done and get respnses as they come in
 	for outstandingRequests > 0 {
-		asyncResult := <-channel
-		if asyncResult.StatusCode == http.StatusOK {
-			out.Results = append(out.Results, asyncResult.Results)
-			out.TotalHits += asyncResult.Results.Pagination.Total
+		poolResponse := <-channel
+		out.Results = append(out.Results, &poolResponse)
+		log.Printf("Pool %s has %d hits and status %d:%s", poolResponse.ServiceURL,
+			poolResponse.Pagination.Total, poolResponse.StatusCode, poolResponse.StatusMessage)
+		if poolResponse.StatusCode == http.StatusOK {
+			out.TotalHits += poolResponse.Pagination.Total
 		} else {
-			log.Printf("ERROR: %s returned %d:%s", asyncResult.PoolURL,
-				asyncResult.StatusCode, asyncResult.Message)
-			out.Warnings = append(out.Warnings, asyncResult.Message)
+			log.Printf("ERROR: %s returned %d:%s", poolResponse.ServiceURL,
+				poolResponse.StatusCode, poolResponse.StatusMessage)
+			out.Warnings = append(out.Warnings, poolResponse.StatusMessage)
 		}
 		outstandingRequests--
 	}
@@ -284,7 +279,7 @@ func (svc *ServiceContext) Search(c *gin.Context) {
 }
 
 // Goroutine to do a pool search and return the PoolResults on the channel
-func searchPool(pool *Pool, req SearchRequest, qp SearchQP, headers map[string]string, channel chan AsyncResponse) {
+func searchPool(pool *Pool, req SearchRequest, qp SearchQP, headers map[string]string, channel chan PoolResult) {
 	// Master search always uses the Private URL to communicate with pools
 	sURL := fmt.Sprintf("%s/api/search?debug=%s&intuit=%s", pool.PrivateURL, qp.debug, qp.intuit)
 	log.Printf("POST search to %s", sURL)
@@ -315,29 +310,39 @@ func searchPool(pool *Pool, req SearchRequest, qp SearchQP, headers map[string]s
 			errMsg = fmt.Sprintf("%s is offline", pool.Name)
 		}
 		pool.Alive = false
-		channel <- AsyncResponse{PoolURL: pool.PrivateURL, StatusCode: status, Message: errMsg}
+		channel <- PoolResult{ServiceURL: pool.PublicURL, StatusCode: status,
+			AvailableFacets: make([]string, 0, 0), Warnings: make([]string, 0, 0),
+			StatusMessage: errMsg, ElapsedMS: elapsedMS}
 		return
 	}
 	defer postResp.Body.Close()
 	bodyBytes, _ := ioutil.ReadAll(postResp.Body)
-
 	if postResp.StatusCode != 200 {
-		channel <- AsyncResponse{PoolURL: pool.PrivateURL, StatusCode: postResp.StatusCode, Message: string(bodyBytes)}
+		channel <- PoolResult{ServiceURL: pool.PublicURL, StatusCode: postResp.StatusCode,
+			Warnings: make([]string, 0, 0), AvailableFacets: make([]string, 0, 0),
+			StatusMessage: string(bodyBytes), ElapsedMS: elapsedMS}
 		return
 	}
 
-	log.Printf("Successful pool response from %s. Elapsed Time: %d (ms)", sURL, elapsedMS)
-	var poolResp PoolResult
-	err = json.Unmarshal(bodyBytes, &poolResp)
+	var poolResults PoolResult
+	err = json.Unmarshal(bodyBytes, &poolResults)
 	if err != nil {
-		log.Printf("ERROR: Unable to parse pool response: %s", err.Error())
-		msg := fmt.Sprintf("%s returned invalid search response", pool.Name)
-		channel <- AsyncResponse{PoolURL: pool.PrivateURL, StatusCode: http.StatusInternalServerError, Message: msg}
+		channel <- PoolResult{ServiceURL: pool.PublicURL, StatusCode: http.StatusInternalServerError,
+			Warnings: make([]string, 0, 0), AvailableFacets: make([]string, 0, 0),
+			StatusMessage: "Malformed search response", ElapsedMS: elapsedMS}
 		return
 	}
 
 	// Add elapsed time and stick it in the master search results format
-	poolResp.ElapsedMS = elapsedMS
+	log.Printf("Successful pool response from %s. Elapsed Time: %d (ms)", sURL, elapsedMS)
+	poolResults.ElapsedMS = elapsedMS
+	poolResults.StatusCode = http.StatusOK
+	if poolResults.Warnings == nil {
+		poolResults.Warnings = make([]string, 0, 0)
+	}
+	if poolResults.AvailableFacets == nil {
+		poolResults.AvailableFacets = make([]string, 0, 0)
+	}
 
-	channel <- AsyncResponse{PoolURL: pool.PrivateURL, StatusCode: http.StatusOK, Results: &poolResp}
+	channel <- poolResults
 }
