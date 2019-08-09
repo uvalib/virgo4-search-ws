@@ -30,7 +30,7 @@ type Pool struct {
 
 // Identify will call the pool /identify endpoint to get full pool details.
 func (p *Pool) Identify() bool {
-	timeout := time.Duration(5 * time.Second)
+	timeout := time.Duration(2 * time.Second)
 	client := http.Client{
 		Timeout: timeout,
 	}
@@ -65,7 +65,7 @@ func (p *Pool) Identify() bool {
 
 // Ping will check the health of a pool by calling /healthcheck and looking for good status
 func (p *Pool) Ping() error {
-	timeout := time.Duration(500 * time.Millisecond)
+	timeout := time.Duration(1500 * time.Millisecond)
 	client := http.Client{
 		Timeout: timeout,
 	}

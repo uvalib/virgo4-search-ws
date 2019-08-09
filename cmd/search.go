@@ -74,6 +74,7 @@ type PoolResult struct {
 	Warnings        []string               `json:"warnings"`
 	StatusCode      int                    `json:"status_code"`
 	StatusMessage   string                 `json:"status_msg,omitempty"`
+	ContentLanguage string                 `json:"-"`
 }
 
 // VirgoFacet contains the fields for a single facet.
@@ -221,10 +222,12 @@ func (svc *ServiceContext) Search(c *gin.Context) {
 	qp := SearchQP{debug: c.Query("debug"), intuit: c.Query("intuit")}
 
 	// headers to send to pool
-	authToken := c.Request.Header.Get("Authorization")
+	authToken := c.GetHeader("Authorization")
+	acceptLang := c.GetHeader("Accept-Language")
 	headers := map[string]string{
-		"Content-Type":  "application/json",
-		"Authorization": authToken,
+		"Content-Type":    "application/json",
+		"Accept-Language": acceptLang,
+		"Authorization":   authToken,
 	}
 
 	// Kick off all pool requests in parallel and wait for all to respond
@@ -249,9 +252,14 @@ func (svc *ServiceContext) Search(c *gin.Context) {
 	}
 
 	// wait for all to be done and get respnses as they come in
+	var contentLanguage string
 	for outstandingRequests > 0 {
 		poolResponse := <-channel
 		out.Results = append(out.Results, &poolResponse)
+		if contentLanguage == "" {
+			contentLanguage = poolResponse.ContentLanguage
+			log.Printf("Set response Content-Language to %s", contentLanguage)
+		}
 		log.Printf("Pool %s has %d hits and status %d:%s", poolResponse.ServiceURL,
 			poolResponse.Pagination.Total, poolResponse.StatusCode, poolResponse.StatusMessage)
 		if poolResponse.StatusCode == http.StatusOK {
@@ -274,7 +282,7 @@ func (svc *ServiceContext) Search(c *gin.Context) {
 	out.TotalTimeMS = elapsedMS
 
 	log.Printf("Received all pool responses. Elapsed Time: %d (ms)", elapsedMS)
-
+	c.Header("Content-Language", contentLanguage)
 	c.JSON(http.StatusOK, out)
 }
 
@@ -297,6 +305,11 @@ func searchPool(pool *Pool, req SearchRequest, qp SearchQP, headers map[string]s
 
 	start := time.Now()
 	postResp, err := client.Do(postReq)
+	respLang := postResp.Header.Get("Content-Language")
+	if respLang == "" {
+		respLang = postReq.Header.Get("Accept-Language")
+		log.Printf("No response Content-Language, default to request accept: %s", respLang)
+	}
 	elapsedNanoSec := time.Since(start)
 	elapsedMS := int64(elapsedNanoSec / time.Millisecond)
 	if err != nil {
@@ -337,6 +350,7 @@ func searchPool(pool *Pool, req SearchRequest, qp SearchQP, headers map[string]s
 	log.Printf("Successful pool response from %s. Elapsed Time: %d (ms)", sURL, elapsedMS)
 	poolResults.ElapsedMS = elapsedMS
 	poolResults.StatusCode = http.StatusOK
+	poolResults.ContentLanguage = respLang
 	if poolResults.Warnings == nil {
 		poolResults.Warnings = make([]string, 0, 0)
 	}
