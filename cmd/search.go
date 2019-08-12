@@ -316,10 +316,10 @@ func searchPool(pool *Pool, req SearchRequest, qp SearchQP, headers map[string]s
 		errMsg := err.Error()
 		if strings.Contains(err.Error(), "Timeout") {
 			status = http.StatusRequestTimeout
-			errMsg = fmt.Sprintf("%s search timed out", pool.Name)
+			errMsg = fmt.Sprintf("%s search timed out", pool.PrivateURL)
 		} else if strings.Contains(err.Error(), "connection refused") {
 			status = http.StatusServiceUnavailable
-			errMsg = fmt.Sprintf("%s is offline", pool.Name)
+			errMsg = fmt.Sprintf("%s is offline", pool.PrivateURL)
 		}
 		pool.Alive = false
 		channel <- PoolResult{ServiceURL: pool.PublicURL, StatusCode: status,

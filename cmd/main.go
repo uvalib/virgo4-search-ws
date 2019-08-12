@@ -40,8 +40,8 @@ func main() {
 	router.GET("/healthcheck", svc.HealthCheck)
 	api := router.Group("/api")
 	{
-		api.GET("/pools", svc.Authenticate, svc.GetPools)
-		api.POST("/search", svc.Authenticate, svc.Search)
+		api.GET("/pools", svc.AuthMiddleware, svc.GetPools)
+		api.POST("/search", svc.AuthMiddleware, svc.Search)
 	}
 
 	portStr := fmt.Sprintf(":%d", cfg.Port)

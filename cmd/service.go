@@ -120,6 +120,7 @@ func (svc *ServiceContext) HealthCheck(c *gin.Context) {
 	}
 }
 
+// getBearerToken is a helper to extract the user auth token from the Auth header
 func getBearerToken(authorization string) (string, error) {
 	components := strings.Split(strings.Join(strings.Fields(authorization), " "), " ")
 
@@ -131,9 +132,9 @@ func getBearerToken(authorization string) (string, error) {
 	return components[1], nil
 }
 
-// Authenticate associates a user with an authorized session
-// (currently we just just ensure that a bearer token was sent)
-func (svc *ServiceContext) Authenticate(c *gin.Context) {
+// AuthMiddleware is a middleware handler that verifies presence of a
+// user Bearer token in the Authorization header.
+func (svc *ServiceContext) AuthMiddleware(c *gin.Context) {
 	token, err := getBearerToken(c.Request.Header.Get("Authorization"))
 
 	if err != nil {

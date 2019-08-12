@@ -16,37 +16,78 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
+// NewPool creates a new pool with the specified private URL. It
+// is initialy not active and has no name, description nor publicURL
+func NewPool(privateURL string) Pool {
+	return Pool{PrivateURL: privateURL,
+		Alive: false, FallbackLanguage: "en-US",
+		Translations: make(map[string]PoolDesc)}
+}
+
 // Pool defines the attributes of a search pool. Pools are initially registered
-// with on the ProvateURL. Full details are read from the /identify endpoint.
-// PrivateURL should not be sent to client in json responses.
+// with only a PrivateURL. Full details are read from the /identify endpoint.
 type Pool struct {
-	ID          string `json:"id"`
+	PrivateURL       string
+	PublicURL        string
+	Alive            bool
+	FallbackLanguage string
+
+	// Translations is a map of pool descriptive info that has been
+	// translated to other languages. Language identifier is the key
+	Translations map[string]PoolDesc
+}
+
+// PoolDesc contains the language-specific name and description of a pool
+type PoolDesc struct {
 	Name        string `json:"name"`
 	Description string `json:"description"`
-	PrivateURL  string `json:"-"`
-	PublicURL   string `json:"url"`
-	Alive       bool   `json:"-"`
+}
+
+// HasIdentity returns true if the pool has been identified in the tgt language
+func (p *Pool) HasIdentity(language string) bool {
+	_, ok := p.Translations[language]
+	return ok
+}
+
+// GetIdentity returns identify information in the target language. If not availble,
+// return the fallback identity. If nothing is available, nil is returned
+func (p *Pool) GetIdentity(language string) *PoolDesc {
+	if desc, ok := p.Translations[language]; ok {
+		return &desc
+	}
+	if desc, ok := p.Translations[p.FallbackLanguage]; ok {
+		return &desc
+	}
+	return nil
 }
 
 // Identify will call the pool /identify endpoint to get full pool details.
-func (p *Pool) Identify() bool {
+func (p *Pool) Identify(language string) *PoolDesc {
+	log.Printf("Identify %s with Accept-Language %s", p.PrivateURL, language)
+	desc := p.GetIdentity(language)
+	if desc != nil {
+		log.Printf("%s already identified in %s as %s", p.PrivateURL, language, desc.Name)
+		return desc
+	}
+
+	fallbackDesc := p.GetIdentity(p.FallbackLanguage)
 	timeout := time.Duration(2 * time.Second)
 	client := http.Client{
 		Timeout: timeout,
 	}
 	URL := fmt.Sprintf("%s/identify", p.PrivateURL)
-	resp, err := client.Get(URL)
+	idRequest, _ := http.NewRequest("GET", URL, nil)
+	idRequest.Header.Set("Accept-Language", language)
+	resp, err := client.Do(idRequest)
 	if err != nil {
 		log.Printf("ERROR: %s /identify failed: %s", p.PrivateURL, err.Error())
-		p.Alive = false
-		return false
+		return fallbackDesc
 	}
 
 	defer resp.Body.Close()
 	if resp.StatusCode != 200 {
-		log.Printf("   * FAIL: %s/identify returned bad status code : %d: ", p.PrivateURL, resp.StatusCode)
-		p.Alive = false
-		return false
+		log.Printf("ERROR: %s/identify returned bad status code : %d: ", p.PrivateURL, resp.StatusCode)
+		return fallbackDesc
 	}
 
 	type idResp struct {
@@ -57,10 +98,12 @@ func (p *Pool) Identify() bool {
 	var identity idResp
 	respTxt, _ := ioutil.ReadAll(resp.Body)
 	json.Unmarshal(respTxt, &identity)
-	p.Name = identity.Name
-	p.Description = identity.Description
 	p.PublicURL = identity.PublicURL
-	return true
+	newDesc := PoolDesc{Name: identity.Name, Description: identity.Description}
+	log.Printf("Adding %s translation %s:%s for %s", language, identity.Name,
+		identity.Description, p.PrivateURL)
+	p.Translations[language] = newDesc
+	return &newDesc
 }
 
 // Ping will check the health of a pool by calling /healthcheck and looking for good status
@@ -95,21 +138,50 @@ func (p *Pool) Ping() error {
 	return nil
 }
 
-// GetPools gets a list of all active pools and returns it as JSON
+// GetPools gets a list of all active pools and returns it as JSON. This
+// request will also pull the Accept-Language header and use it to call (if necessary)
+// pool.Identify to get the name/description for each pool in the proper language.
+// Identification info is cached in-memory under the taget language.
 func (svc *ServiceContext) GetPools(c *gin.Context) {
 	if len(svc.Pools) == 0 {
+		log.Printf("No pools available")
 		c.JSON(http.StatusOK, make([]*Pool, 0, 1))
-	} else {
-		// only return those pools that are listed as alive.
-		// others have errors and are not currently in use
-		active := make([]*Pool, 0)
-		for _, p := range svc.Pools {
-			if p.Alive {
-				active = append(active, p)
-			}
-		}
-		c.JSON(http.StatusOK, active)
+		return
 	}
+
+	// define the public data which describes a pool
+	type poolInfo struct {
+		PublicURL   string `json:"url"`
+		Name        string `json:"name"`
+		Description string `json:"description"`
+	}
+
+	// Pick the first option in Accept-Language header - or en-US if none
+	acceptLang := strings.Split(c.GetHeader("Accept-Language"), ",")[0]
+	if acceptLang == "" {
+		acceptLang = "en-US"
+	}
+
+	log.Printf("Get %s active pool info", acceptLang)
+	active := make([]poolInfo, 0)
+	for _, p := range svc.Pools {
+		if p.Alive {
+			// NOTES: each in-memory pool tracks name/desc inf pairs in a map
+			// keyed by language. If the requested translation doesn't exist,
+			// look it up and cache the results. All pools have a fallback translation
+			// that is popuated upon registration. Use that if other translate fails.
+			pi := poolInfo{PublicURL: p.PublicURL}
+			desc := p.GetIdentity(acceptLang)
+			if desc == nil {
+				p.Identify(acceptLang)
+				desc = p.GetIdentity(acceptLang)
+			}
+			pi.Name = desc.Name
+			pi.Description = desc.Description
+			active = append(active, pi)
+		}
+	}
+	c.JSON(http.StatusOK, active)
 }
 
 // PoolExists checks if a pool with the given URL exists, regardless of the current status.
@@ -155,7 +227,7 @@ func (svc *ServiceContext) UpdateAuthoritativePools() error {
 		URL string
 	}
 	var authoritativeURLs []string
-	for idx, ddbItem := range result.Items {
+	for _, ddbItem := range result.Items {
 		item := Item{}
 		err = dynamodbattribute.UnmarshalMap(ddbItem, &item)
 		if err != nil {
@@ -167,8 +239,7 @@ func (svc *ServiceContext) UpdateAuthoritativePools() error {
 				continue
 			}
 			log.Printf("Authoritative pools update found new pool URL %s", item.URL)
-			pool := Pool{ID: fmt.Sprintf("%d", idx+1), PrivateURL: item.URL}
-			svc.AddPool(pool)
+			svc.AddPool(item.URL)
 		}
 	}
 
@@ -192,25 +263,26 @@ func (svc *ServiceContext) LoadDevPools() {
 			continue
 		}
 		log.Printf("Authoritative pools update found new pool URL %s", svcURL)
-		pool := Pool{PrivateURL: svcURL}
-		newID := len(svc.Pools) + 1
-		pool.ID = fmt.Sprintf("%d", newID)
-		svc.AddPool(pool)
+		svc.AddPool(svcURL)
 	}
 	svc.PrunePools(authoritativeURLs)
 }
 
-// AddPool will ping and identify a new pool. If both are successful, the pool as added to the in-memory
-// list of available pools.
-func (svc *ServiceContext) AddPool(pool Pool) {
+// AddPool will create a new pool, ping it and add it to the in-memory pool cache if successful.
+// Pools are initially identified with default language en-US.
+func (svc *ServiceContext) AddPool(privateURL string) {
+	pool := NewPool(privateURL)
 	if err := pool.Ping(); err != nil {
 		log.Printf("   * %s is not available: %s", pool.PrivateURL, err.Error())
 	} else {
-		if pool.Identify() {
-			log.Printf("   * %s is alive and identified %s", pool.PrivateURL, pool.Name)
+		desc := pool.Identify("en-US")
+		if desc != nil {
+			desc := pool.GetIdentity("en-US")
+			log.Printf("   * %s is alive and identified (en-US) as %s", pool.PrivateURL, desc.Name)
 			svc.Pools = append(svc.Pools, &pool)
 		} else {
-			log.Printf("   * %s is alive, but failed identify. Skipping", pool.PrivateURL)
+			log.Printf("   * %s is alive, but failed identify", pool.PrivateURL)
+			svc.Pools = append(svc.Pools, &pool)
 		}
 	}
 }
@@ -228,7 +300,7 @@ func (svc *ServiceContext) PrunePools(authoritativeURLs []string) {
 			}
 		}
 		if found == false {
-			log.Printf("Pool %s:%s is no longer on the authoritative list. Removing", p.Name, p.PrivateURL)
+			log.Printf("Pool %s is no longer on the authoritative list. Removing", p.PrivateURL)
 			svc.Pools = append(svc.Pools[:idx], svc.Pools[idx+1:]...)
 		}
 	}
