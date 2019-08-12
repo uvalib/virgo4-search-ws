@@ -18,14 +18,9 @@ const version = "1.0.0"
 func main() {
 	log.Printf("===> V4 search service staring up <===")
 
-	// Get config params; service port, directories, DB
-	cfg := ServiceConfig{}
-	cfg.Load()
-	svc := ServiceContext{Version: version, Pools: make([]*Pool, 0)}
-	err := svc.Init(&cfg)
-	if err != nil {
-		log.Fatalf("Unable to initialize service: %s", err.Error())
-	}
+	// Get config params and use them to init service context. Any issues are fatal
+	cfg := LoadConfiguration()
+	svc := InitializeService(version, cfg)
 
 	log.Printf("Setup routes...")
 	gin.SetMode(gin.ReleaseMode)
@@ -45,7 +40,7 @@ func main() {
 	router.GET("/healthcheck", svc.HealthCheck)
 	api := router.Group("/api")
 	{
-		api.GET("/pools", svc.GetPools)
+		api.GET("/pools", svc.Authenticate, svc.GetPools)
 		api.POST("/search", svc.Authenticate, svc.Search)
 	}
 

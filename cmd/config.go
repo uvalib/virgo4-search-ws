@@ -15,10 +15,11 @@ type ServiceConfig struct {
 	PoolsFile     string
 }
 
-// Load will load the service configuration from env/cmdline
-func (cfg *ServiceConfig) Load() {
+// LoadConfiguration will load the service configuration from env/cmdline
+// and return a pointer to it. Any failures are fatal.
+func LoadConfiguration() *ServiceConfig {
 	log.Printf("Loading configuration...")
-
+	var cfg ServiceConfig
 	flag.IntVar(&cfg.Port, "port", 8080, "Service port (default 8080)")
 	flag.StringVar(&cfg.AWSAccessKey, "aws_access", "", "AWS Access Key")
 	flag.StringVar(&cfg.AWSSecretKey, "aws_secret", "", "AWS Secret Key")
@@ -32,4 +33,5 @@ func (cfg *ServiceConfig) Load() {
 	if cfg.AWSAccessKey != "" && cfg.PoolsFile != "" {
 		log.Fatal("FATAL: Specify AWS config or dev config, not both")
 	}
+	return &cfg
 }

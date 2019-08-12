@@ -176,7 +176,7 @@ func (svc *ServiceContext) Search(c *gin.Context) {
 	var req SearchRequest
 	if err := c.BindJSON(&req); err != nil {
 		log.Printf("ERROR: unable to parse search request: %s", err.Error())
-		c.String(http.StatusBadRequest, err.Error())
+		c.String(http.StatusBadRequest, "Invalid search request")
 		return
 	}
 	log.Printf("Search Request %+v", req)
@@ -190,7 +190,7 @@ func (svc *ServiceContext) Search(c *gin.Context) {
 	valid, errors := v4parser.Validate(req.Query)
 	if valid == false {
 		log.Printf("ERROR: Query [%s] is not valid: %s", req.Query, errors)
-		c.String(http.StatusBadRequest, errors)
+		c.String(http.StatusBadRequest, "Invalid search request")
 		return
 	}
 
@@ -308,7 +308,6 @@ func searchPool(pool *Pool, req SearchRequest, qp SearchQP, headers map[string]s
 	respLang := postResp.Header.Get("Content-Language")
 	if respLang == "" {
 		respLang = postReq.Header.Get("Accept-Language")
-		log.Printf("No response Content-Language, default to request accept: %s", respLang)
 	}
 	elapsedNanoSec := time.Since(start)
 	elapsedMS := int64(elapsedNanoSec / time.Millisecond)

@@ -24,10 +24,12 @@ type ServiceContext struct {
 	Pools        []*Pool
 }
 
-// Init will initialize the service context based on the config parameters. Any
-// pools found in redis will be added to the context and polled for status
-func (svc *ServiceContext) Init(cfg *ServiceConfig) error {
+// InitializeService will initialize the service context based on the config parameters.
+// Any pools found in the DB will be added to the context and polled for status.
+// Any errors are FATAL.
+func InitializeService(version string, cfg *ServiceConfig) *ServiceContext {
 	log.Printf("Initializing Service...")
+	svc := ServiceContext{Version: version, Pools: make([]*Pool, 0)}
 	if cfg.PoolsFile != "" {
 		svc.DevPoolsFile = cfg.PoolsFile
 		svc.LoadDevPools()
@@ -49,7 +51,7 @@ func (svc *ServiceContext) Init(cfg *ServiceConfig) error {
 		svc.PoolsTable = cfg.DynamoDBTable
 		err := svc.UpdateAuthoritativePools()
 		if err != nil {
-			return err
+			log.Fatalf("Unable to initialize search pools: %s", err.Error())
 		}
 	}
 
@@ -69,7 +71,7 @@ func (svc *ServiceContext) Init(cfg *ServiceConfig) error {
 		}
 	}()
 
-	return nil
+	return &svc
 }
 
 // IgnoreFavicon is a dummy to handle browser favicon requests without warnings
