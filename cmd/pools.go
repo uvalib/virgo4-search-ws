@@ -37,6 +37,14 @@ type Pool struct {
 	Translations map[string]PoolDesc
 }
 
+// PublicPoolInfo contains public pool information that has been translated
+// to the language of the client
+type PublicPoolInfo struct {
+	PublicURL   string `json:"url"`
+	Name        string `json:"name"`
+	Description string `json:"description"`
+}
+
 // PoolDesc contains the language-specific name and description of a pool
 type PoolDesc struct {
 	Name        string `json:"name"`
@@ -138,22 +146,15 @@ func (p *Pool) Ping() error {
 	return nil
 }
 
-// GetPools gets a list of all active pools and returns it as JSON. This
+// GetPoolsRequest gets a list of all active pools and returns it as JSON. This
 // request will also pull the Accept-Language header and use it to call (if necessary)
 // pool.Identify to get the name/description for each pool in the proper language.
 // Identification info is cached in-memory under the taget language.
-func (svc *ServiceContext) GetPools(c *gin.Context) {
+func (svc *ServiceContext) GetPoolsRequest(c *gin.Context) {
 	if len(svc.Pools) == 0 {
 		log.Printf("No pools available")
 		c.JSON(http.StatusOK, make([]*Pool, 0, 1))
 		return
-	}
-
-	// define the public data which describes a pool
-	type poolInfo struct {
-		PublicURL   string `json:"url"`
-		Name        string `json:"name"`
-		Description string `json:"description"`
 	}
 
 	// Pick the first option in Accept-Language header - or en-US if none
@@ -162,26 +163,32 @@ func (svc *ServiceContext) GetPools(c *gin.Context) {
 		acceptLang = "en-US"
 	}
 
-	log.Printf("Get %s active pool info", acceptLang)
-	active := make([]poolInfo, 0)
+	pools := svc.GetPublicPoolInfo(acceptLang)
+	c.JSON(http.StatusOK, pools)
+}
+
+// GetPublicPoolInfo gets the public URL and localized  name/description for all active pools
+func (svc *ServiceContext) GetPublicPoolInfo(language string) []PublicPoolInfo {
+	log.Printf("Get %s public pool info", language)
+	pools := make([]PublicPoolInfo, 0)
 	for _, p := range svc.Pools {
 		if p.Alive {
 			// NOTES: each in-memory pool tracks name/desc inf pairs in a map
 			// keyed by language. If the requested translation doesn't exist,
 			// look it up and cache the results. All pools have a fallback translation
 			// that is popuated upon registration. Use that if other translate fails.
-			pi := poolInfo{PublicURL: p.PublicURL}
-			desc := p.GetIdentity(acceptLang)
+			pi := PublicPoolInfo{PublicURL: p.PublicURL}
+			desc := p.GetIdentity(language)
 			if desc == nil {
-				p.Identify(acceptLang)
-				desc = p.GetIdentity(acceptLang)
+				p.Identify(language)
+				desc = p.GetIdentity(language)
 			}
 			pi.Name = desc.Name
 			pi.Description = desc.Description
-			active = append(active, pi)
+			pools = append(pools, pi)
 		}
 	}
-	c.JSON(http.StatusOK, active)
+	return pools
 }
 
 // PoolExists checks if a pool with the given URL exists, regardless of the current status.

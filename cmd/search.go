@@ -46,12 +46,12 @@ func NewSearchResponse(req *SearchRequest) *SearchResponse {
 
 // SearchResponse contains all search resonse data
 type SearchResponse struct {
-	Request     *SearchRequest `json:"request"`
-	Pools       []*Pool        `json:"pools"`
-	TotalTimeMS int64          `json:"total_time_ms"`
-	TotalHits   int            `json:"total_hits"`
-	Results     []*PoolResult  `json:"pool_results"`
-	Warnings    []string       `json:"warnings"`
+	Request     *SearchRequest   `json:"request"`
+	Pools       []PublicPoolInfo `json:"pools"`
+	TotalTimeMS int64            `json:"total_time_ms"`
+	TotalHits   int              `json:"total_hits"`
+	Results     []*PoolResult    `json:"pool_results"`
+	Warnings    []string         `json:"warnings"`
 }
 
 // Pagination cantains pagination info
@@ -179,14 +179,8 @@ func (svc *ServiceContext) Search(c *gin.Context) {
 		c.String(http.StatusBadRequest, "Invalid search request")
 		return
 	}
-	log.Printf("Search Request %+v", req)
-	out := NewSearchResponse(&req)
-	for _, p := range svc.Pools {
-		if p.Alive {
-			out.Pools = append(out.Pools, p)
-		}
-	}
 
+	log.Printf("Search Request %+v", req)
 	valid, errors := v4parser.Validate(req.Query)
 	if valid == false {
 		log.Printf("ERROR: Query [%s] is not valid: %s", req.Query, errors)
@@ -203,6 +197,7 @@ func (svc *ServiceContext) Search(c *gin.Context) {
 
 	// Just before each search, check the authoritative pool list
 	// and see if any new pools have been added, or pools have been retired.
+	out := NewSearchResponse(&req)
 	start := time.Now()
 	log.Printf("Pre-search, pre-update pools count %d", len(svc.Pools))
 	svc.UpdateAuthoritativePools()
@@ -213,6 +208,17 @@ func (svc *ServiceContext) Search(c *gin.Context) {
 	}
 	log.Printf("Pre-search, post-update pools count %d", len(svc.Pools))
 
+	// headers to send to pool
+	acceptLang := c.GetHeader("Accept-Language")
+	headers := map[string]string{
+		"Content-Type":    "application/json",
+		"Accept-Language": acceptLang,
+		"Authorization":   c.GetHeader("Authorization"),
+	}
+
+	// Get all public pool info in the language of the client request
+	out.Pools = svc.GetPublicPoolInfo(acceptLang)
+
 	if req.Preferences.TargetPool != "" && svc.IsPoolActive(req.Preferences.TargetPool) == false {
 		log.Printf("WARNING: Target Pool %s is not registered", req.Preferences.TargetPool)
 		out.Warnings = append(out.Warnings, "Target pool is not active")
@@ -220,15 +226,6 @@ func (svc *ServiceContext) Search(c *gin.Context) {
 
 	// grab QP config for debug or search intuit
 	qp := SearchQP{debug: c.Query("debug"), intuit: c.Query("intuit")}
-
-	// headers to send to pool
-	authToken := c.GetHeader("Authorization")
-	acceptLang := c.GetHeader("Accept-Language")
-	headers := map[string]string{
-		"Content-Type":    "application/json",
-		"Accept-Language": acceptLang,
-		"Authorization":   authToken,
-	}
 
 	// Kick off all pool requests in parallel and wait for all to respond
 	channel := make(chan PoolResult)
