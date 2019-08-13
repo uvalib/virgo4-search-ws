@@ -184,7 +184,7 @@ func (svc *ServiceContext) Search(c *gin.Context) {
 		c.String(http.StatusBadRequest, msg)
 		return
 	}
-	log.Printf("Search Request %+v", req)
+	log.Printf("Search Request %+v with Accept-Language %s", req, acceptLang)
 
 	valid, errors := v4parser.Validate(req.Query)
 	if valid == false {

@@ -57,13 +57,10 @@ func (p *Pool) HasIdentity(language string) bool {
 	return ok
 }
 
-// GetIdentity returns identify information in the target language. If not availble,
-// return the fallback identity. If nothing is available, nil is returned
+// GetIdentity returns identify information in the target language.
+// If not availble nil is returned.
 func (p *Pool) GetIdentity(language string) *PoolDesc {
 	if desc, ok := p.Translations[language]; ok {
-		return &desc
-	}
-	if desc, ok := p.Translations[p.FallbackLanguage]; ok {
 		return &desc
 	}
 	return nil
@@ -159,6 +156,7 @@ func (svc *ServiceContext) GetPoolsRequest(c *gin.Context) {
 
 	// Pick the first option in Accept-Language header - or en-US if none
 	acceptLang := strings.Split(c.GetHeader("Accept-Language"), ",")[0]
+	log.Printf("GetPools Accept-Language %s", acceptLang)
 	if acceptLang == "" {
 		acceptLang = "en-US"
 	}
@@ -182,6 +180,9 @@ func (svc *ServiceContext) GetPublicPoolInfo(language string) []PublicPoolInfo {
 			if desc == nil {
 				p.Identify(language)
 				desc = p.GetIdentity(language)
+			}
+			if desc == nil {
+				desc = p.GetIdentity(p.FallbackLanguage)
 			}
 			pi.Name = desc.Name
 			pi.Description = desc.Description
@@ -284,7 +285,6 @@ func (svc *ServiceContext) AddPool(privateURL string) {
 	} else {
 		desc := pool.Identify("en-US")
 		if desc != nil {
-			desc := pool.GetIdentity("en-US")
 			log.Printf("   * %s is alive and identified (en-US) as %s", pool.PrivateURL, desc.Name)
 			svc.Pools = append(svc.Pools, &pool)
 		} else {
