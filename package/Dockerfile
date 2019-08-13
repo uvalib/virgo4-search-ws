@@ -5,6 +5,7 @@ FROM golang:1.12 as builder
 WORKDIR /build
 COPY go.mod go.sum Makefile ./
 COPY cmd ./cmd
+COPY i18n ./i18n
 RUN make linux
 
 #
@@ -27,7 +28,7 @@ ENV APP_HOME /v4-master-search-ws
 WORKDIR $APP_HOME
 
 # Create necessary directories
-RUN mkdir -p $APP_HOME $APP_HOME/bin $APP_HOME/scripts
+RUN mkdir -p $APP_HOME $APP_HOME/bin $APP_HOME/bin/i18n $APP_HOME/scripts
 RUN chown -R webservice $APP_HOME && chgrp -R webservice $APP_HOME
 
 # port and run command
@@ -38,6 +39,7 @@ CMD scripts/entry.sh
 COPY package/data/container_bash_profile /home/webservice/.profile
 COPY package/scripts/entry.sh $APP_HOME/scripts/entry.sh
 COPY --from=builder /build/bin/v4search.linux $APP_HOME/bin/v4search
+COPY i18n/* $APP_HOME/bin/i18n/
 
 # Ensure permissions are correct
 RUN chown webservice:webservice /home/webservice/.profile $APP_HOME/scripts/entry.sh $APP_HOME/bin/v4search && chmod 755 /home/webservice/.profile $APP_HOME/scripts/entry.sh $APP_HOME/bin/v4search
