@@ -8,11 +8,14 @@ import (
 	"strings"
 	"time"
 
+	"github.com/BurntSushi/toml"
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/credentials"
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/dynamodb"
 	"github.com/gin-gonic/gin"
+	"github.com/nicksnyder/go-i18n/v2/i18n"
+	"golang.org/x/text/language"
 )
 
 // ServiceContext contains common data used by all handlers
@@ -22,14 +25,22 @@ type ServiceContext struct {
 	DevPoolsFile string
 	DynamoDB     *dynamodb.DynamoDB
 	Pools        []*Pool
+	I18NBundle   *i18n.Bundle
 }
 
 // InitializeService will initialize the service context based on the config parameters.
 // Any pools found in the DB will be added to the context and polled for status.
 // Any errors are FATAL.
 func InitializeService(version string, cfg *ServiceConfig) *ServiceContext {
-	log.Printf("Initializing Service...")
+	log.Printf("Initializing Service")
 	svc := ServiceContext{Version: version, Pools: make([]*Pool, 0)}
+
+	log.Printf("Init localization")
+	svc.I18NBundle = i18n.NewBundle(language.English)
+	svc.I18NBundle.RegisterUnmarshalFunc("toml", toml.Unmarshal)
+	svc.I18NBundle.MustLoadMessageFile("./i18n/active.en.toml")
+	svc.I18NBundle.MustLoadMessageFile("./i18n/active.es.toml")
+
 	if cfg.PoolsFile != "" {
 		svc.DevPoolsFile = cfg.PoolsFile
 		svc.LoadDevPools()

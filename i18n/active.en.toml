@@ -1,0 +1,4 @@
+BadSearch="Invalid search request"
+TargetExcluded="Target source cannot be excluded"
+NoPools="No sources available"
+TargetPoolUnavailable="Target source is not available"

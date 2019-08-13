@@ -11,6 +11,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/nicksnyder/go-i18n/v2/i18n"
+
 	"github.com/gin-gonic/gin"
 	"github.com/uvalib/virgo4-parser/v4parser"
 )
@@ -173,25 +175,30 @@ func (s *byConfidence) Less(i, j int) bool {
 
 // Search queries all pools for results, collects and curates results. Responds with JSON.
 func (svc *ServiceContext) Search(c *gin.Context) {
+	acceptLang := c.GetHeader("Accept-Language")
+	localizer := i18n.NewLocalizer(svc.I18NBundle, acceptLang)
 	var req SearchRequest
 	if err := c.BindJSON(&req); err != nil {
 		log.Printf("ERROR: unable to parse search request: %s", err.Error())
-		c.String(http.StatusBadRequest, "Invalid search request")
+		msg := localizer.MustLocalize(&i18n.LocalizeConfig{MessageID: "BadSearch"})
+		c.String(http.StatusBadRequest, msg)
 		return
 	}
-
 	log.Printf("Search Request %+v", req)
+
 	valid, errors := v4parser.Validate(req.Query)
 	if valid == false {
 		log.Printf("ERROR: Query [%s] is not valid: %s", req.Query, errors)
-		c.String(http.StatusBadRequest, "Invalid search request")
+		msg := localizer.MustLocalize(&i18n.LocalizeConfig{MessageID: "BadSearch"})
+		c.String(http.StatusBadRequest, msg)
 		return
 	}
 
 	// see if target pool is also in exclude list
 	if req.Preferences.TargetPool != "" && req.Preferences.IsExcluded(req.Preferences.TargetPool) {
 		log.Printf("ERROR: Target Pool %s is also excluded", req.Preferences.TargetPool)
-		c.String(http.StatusBadRequest, "Target pool cannot be excluded")
+		msg := localizer.MustLocalize(&i18n.LocalizeConfig{MessageID: "TargetExcluded"})
+		c.String(http.StatusBadRequest, msg)
 		return
 	}
 
@@ -203,29 +210,30 @@ func (svc *ServiceContext) Search(c *gin.Context) {
 	svc.UpdateAuthoritativePools()
 	if len(svc.Pools) == 0 {
 		log.Printf("ERROR: No search pools registered")
-		c.String(http.StatusInternalServerError, "No search pools available")
+		msg := localizer.MustLocalize(&i18n.LocalizeConfig{MessageID: "NoPools"})
+		c.String(http.StatusInternalServerError, msg)
 		return
 	}
 	log.Printf("Pre-search, post-update pools count %d", len(svc.Pools))
-
-	// headers to send to pool
-	acceptLang := c.GetHeader("Accept-Language")
-	headers := map[string]string{
-		"Content-Type":    "application/json",
-		"Accept-Language": acceptLang,
-		"Authorization":   c.GetHeader("Authorization"),
-	}
 
 	// Get all public pool info in the language of the client request
 	out.Pools = svc.GetPublicPoolInfo(acceptLang)
 
 	if req.Preferences.TargetPool != "" && svc.IsPoolActive(req.Preferences.TargetPool) == false {
 		log.Printf("WARNING: Target Pool %s is not registered", req.Preferences.TargetPool)
-		out.Warnings = append(out.Warnings, "Target pool is not active")
+		msg := localizer.MustLocalize(&i18n.LocalizeConfig{MessageID: "TargetPoolUnavailable"})
+		out.Warnings = append(out.Warnings, msg)
 	}
 
 	// grab QP config for debug or search intuit
 	qp := SearchQP{debug: c.Query("debug"), intuit: c.Query("intuit")}
+
+	// headers to send to pool
+	headers := map[string]string{
+		"Content-Type":    "application/json",
+		"Accept-Language": acceptLang,
+		"Authorization":   c.GetHeader("Authorization"),
+	}
 
 	// Kick off all pool requests in parallel and wait for all to respond
 	channel := make(chan PoolResult)
