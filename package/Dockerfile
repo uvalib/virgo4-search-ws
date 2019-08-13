@@ -38,11 +38,13 @@ CMD scripts/entry.sh
 # Move in necessary assets
 COPY package/data/container_bash_profile /home/webservice/.profile
 COPY package/scripts/entry.sh $APP_HOME/scripts/entry.sh
+COPY i18n $APP_HOME/bin/i18n
 COPY --from=builder /build/bin/v4search.linux $APP_HOME/bin/v4search
 COPY i18n/* $APP_HOME/bin/i18n/
 
+
 # Ensure permissions are correct
-RUN chown webservice:webservice /home/webservice/.profile $APP_HOME/scripts/entry.sh $APP_HOME/bin/v4search && chmod 755 /home/webservice/.profile $APP_HOME/scripts/entry.sh $APP_HOME/bin/v4search
+RUN chown webservice:webservice /home/webservice/.profile $APP_HOME/scripts/entry.sh $APP_HOME/bin/v4search $APP_HOME/bin/i18n && chmod 755 /home/webservice/.profile $APP_HOME/scripts/entry.sh $APP_HOME/bin/v4search $APP_HOME/bin/i18n
 
 # Add the build tag
 ARG BUILD_TAG
