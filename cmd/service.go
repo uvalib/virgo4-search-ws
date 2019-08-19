@@ -9,23 +9,19 @@ import (
 	"time"
 
 	"github.com/BurntSushi/toml"
-	"github.com/aws/aws-sdk-go/aws"
-	"github.com/aws/aws-sdk-go/aws/credentials"
-	"github.com/aws/aws-sdk-go/aws/session"
-	"github.com/aws/aws-sdk-go/service/dynamodb"
 	"github.com/gin-gonic/gin"
+	dbx "github.com/go-ozzo/ozzo-dbx"
+	_ "github.com/lib/pq"
 	"github.com/nicksnyder/go-i18n/v2/i18n"
 	"golang.org/x/text/language"
 )
 
 // ServiceContext contains common data used by all handlers
 type ServiceContext struct {
-	Version      string
-	PoolsTable   string
-	DevPoolsFile string
-	DynamoDB     *dynamodb.DynamoDB
-	Pools        []*Pool
-	I18NBundle   *i18n.Bundle
+	Version    string
+	DB         *dbx.DB
+	Pools      []*Pool
+	I18NBundle *i18n.Bundle
 }
 
 // InitializeService will initialize the service context based on the config parameters.
@@ -35,35 +31,26 @@ func InitializeService(version string, cfg *ServiceConfig) *ServiceContext {
 	log.Printf("Initializing Service")
 	svc := ServiceContext{Version: version, Pools: make([]*Pool, 0)}
 
+	log.Printf("Connect to Postgres")
+	connStr := fmt.Sprintf("user=%s password=%s dbname=%s host=%s port=%d sslmode=disable",
+		cfg.DBUser, cfg.DBPass, cfg.DBName, cfg.DBHost, cfg.DBPort)
+	db, err := dbx.Open("postgres", connStr)
+	if err != nil {
+		log.Fatal(err)
+	}
+	db.LogFunc = log.Printf
+	svc.DB = db
+
 	log.Printf("Init localization")
 	svc.I18NBundle = i18n.NewBundle(language.English)
 	svc.I18NBundle.RegisterUnmarshalFunc("toml", toml.Unmarshal)
 	svc.I18NBundle.MustLoadMessageFile("./i18n/active.en.toml")
 	svc.I18NBundle.MustLoadMessageFile("./i18n/active.es.toml")
 
-	if cfg.PoolsFile != "" {
-		svc.DevPoolsFile = cfg.PoolsFile
-		svc.LoadDevPools()
-	} else {
-		if cfg.AWSAccessKey == "" {
-			log.Printf("Init AWS DynamoDB Session using AWS role")
-			sess := session.Must(session.NewSession(&aws.Config{
-				Region: aws.String(cfg.AWSRegion),
-			}))
-			svc.DynamoDB = dynamodb.New(sess)
-		} else {
-			log.Printf("Init AWS DynamoDB Session using passed keys")
-			sess := session.Must(session.NewSession(&aws.Config{
-				Region:      aws.String(cfg.AWSRegion),
-				Credentials: credentials.NewStaticCredentials(cfg.AWSAccessKey, cfg.AWSSecretKey, ""),
-			}))
-			svc.DynamoDB = dynamodb.New(sess)
-		}
-		svc.PoolsTable = cfg.DynamoDBTable
-		err := svc.UpdateAuthoritativePools()
-		if err != nil {
-			log.Fatalf("Unable to initialize search pools: %s", err.Error())
-		}
+	log.Printf("Init search pools")
+	err = svc.UpdateAuthoritativePools()
+	if err != nil {
+		log.Fatalf("Unable to initialize search pools: %s", err.Error())
 	}
 
 	// Start a ticker to periodically poll pools and mark them
@@ -115,6 +102,16 @@ func (svc *ServiceContext) HealthCheck(c *gin.Context) {
 		Message string `json:"message,omitempty"`
 	}
 	hcMap := make(map[string]hcResp)
+
+	tq := svc.DB.NewQuery("select count(*) as total from sources")
+	var total int
+	err := tq.Row(&total)
+	if err != nil {
+		hcMap["postgres"] = hcResp{Healthy: false, Message: err.Error()}
+	} else {
+		hcMap["postgres"] = hcResp{Healthy: true}
+	}
+
 	healthyCount := 0
 	for _, p := range svc.Pools {
 		if err := p.Ping(); err != nil {

@@ -1,7 +1,6 @@
 package main
 
 import (
-	"bufio"
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
@@ -10,9 +9,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/aws/aws-sdk-go/aws"
-	"github.com/aws/aws-sdk-go/service/dynamodb"
-	"github.com/aws/aws-sdk-go/service/dynamodb/dynamodbattribute"
 	"github.com/gin-gonic/gin"
 )
 
@@ -216,64 +212,32 @@ func (svc *ServiceContext) IsPoolActive(url string) bool {
 // will be added to an in-memory cache. If an existing pool is not found in the
 // list, it will be removed from service.
 func (svc *ServiceContext) UpdateAuthoritativePools() error {
-	if svc.DevPoolsFile != "" {
-		svc.LoadDevPools()
-		return nil
+	var sources []struct {
+		ID  int    `db:"id"`
+		URL string `db:"private_url"`
 	}
-	log.Printf("Scanning for pool updates in %s", svc.PoolsTable)
-	params := dynamodb.ScanInput{
-		TableName: aws.String(svc.PoolsTable),
-	}
-	result, err := svc.DynamoDB.Scan(&params)
+	q := svc.DB.NewQuery(`select private_url from sources`)
+	err := q.All(&sources)
 	if err != nil {
-		log.Printf("ERROR: Unable to retrieve pools from AWS: %v", err)
+		log.Printf("ERROR: Unable to get authoritative URLS: %v", err)
 		return err
 	}
 
-	// NOTE: This structure matches the only attribute value in the DynamoDB table
-	type Item struct {
-		URL string
-	}
 	var authoritativeURLs []string
-	for _, ddbItem := range result.Items {
-		item := Item{}
-		err = dynamodbattribute.UnmarshalMap(ddbItem, &item)
-		if err != nil {
-			log.Printf("Unable to read DDB item %v: %v", ddbItem, err)
-		} else {
-			authoritativeURLs = append(authoritativeURLs, item.URL)
-			if svc.PoolExists(item.URL) {
-				// pool already exists; no nothing
-				continue
-			}
-			log.Printf("Authoritative pools update found new pool URL %s", item.URL)
-			svc.AddPool(item.URL)
+	for _, src := range sources {
+		authoritativeURLs = append(authoritativeURLs, src.URL)
+		if svc.PoolExists(src.URL) {
+			// pool already exists; no nothing
+			continue
 		}
+		log.Printf("Authoritative pools update found new pool URL %s", src.URL)
+		svc.AddPool(src.URL)
 	}
 
 	// Now see if there are any pools in memory that are no longer in the
 	// authoritatve list, they have been retired and should be dropped
 	svc.PrunePools(authoritativeURLs)
 	return nil
-}
-
-// LoadDevPools is only used in local development mode. It will fetch a static list of
-// pools from a text file. These pools will be pinged for health, but not updated.
-func (svc *ServiceContext) LoadDevPools() {
-	log.Printf("Load pools from dev mode pools file %s", svc.DevPoolsFile)
-	data, _ := ioutil.ReadFile(svc.DevPoolsFile)
-	scanner := bufio.NewScanner(strings.NewReader(string(data)))
-	var authoritativeURLs []string
-	for scanner.Scan() {
-		svcURL := scanner.Text()
-		authoritativeURLs = append(authoritativeURLs, svcURL)
-		if svc.PoolExists(svcURL) {
-			continue
-		}
-		log.Printf("Authoritative pools update found new pool URL %s", svcURL)
-		svc.AddPool(svcURL)
-	}
-	svc.PrunePools(authoritativeURLs)
 }
 
 // AddPool will create a new pool, ping it and add it to the in-memory pool cache if successful.
