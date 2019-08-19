@@ -310,10 +310,6 @@ func searchPool(pool *Pool, req SearchRequest, qp SearchQP, headers map[string]s
 
 	start := time.Now()
 	postResp, err := client.Do(postReq)
-	respLang := postResp.Header.Get("Content-Language")
-	if respLang == "" {
-		respLang = postReq.Header.Get("Accept-Language")
-	}
 	elapsedNanoSec := time.Since(start)
 	elapsedMS := int64(elapsedNanoSec / time.Millisecond)
 	if err != nil {
@@ -332,6 +328,7 @@ func searchPool(pool *Pool, req SearchRequest, qp SearchQP, headers map[string]s
 			StatusMessage: errMsg, ElapsedMS: elapsedMS}
 		return
 	}
+
 	defer postResp.Body.Close()
 	bodyBytes, _ := ioutil.ReadAll(postResp.Body)
 	if postResp.StatusCode != 200 {
@@ -348,6 +345,12 @@ func searchPool(pool *Pool, req SearchRequest, qp SearchQP, headers map[string]s
 			Warnings: make([]string, 0, 0), AvailableFacets: make([]string, 0, 0),
 			StatusMessage: "Malformed search response", ElapsedMS: elapsedMS}
 		return
+	}
+
+	// If we are this far, there is a valid response. Add language
+	respLang := postResp.Header.Get("Content-Language")
+	if respLang == "" {
+		respLang = postReq.Header.Get("Accept-Language")
 	}
 
 	// Add elapsed time and stick it in the master search results format
