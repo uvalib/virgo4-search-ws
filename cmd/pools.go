@@ -216,7 +216,7 @@ func (svc *ServiceContext) UpdateAuthoritativePools() error {
 		ID  int    `db:"id"`
 		URL string `db:"private_url"`
 	}
-	q := svc.DB.NewQuery(`select private_url from sources`)
+	q := svc.DB.NewQuery(`select * from sources`)
 	err := q.All(&sources)
 	if err != nil {
 		log.Printf("ERROR: Unable to get authoritative URLS: %v", err)
