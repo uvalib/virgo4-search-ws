@@ -100,10 +100,11 @@ type Record struct {
 // RecordField contains metadata for a single field in a record.
 type RecordField struct {
 	Name       string `json:"name"`
-	Type       string `json:"type"` // assume simple string if not provided
+	Type       string `json:"type,omitempty"` // empty implies "text"
 	Label      string `json:"label"`
 	Value      string `json:"value"`
-	Visibility string `json:"visibility"` // e.g. "basic" or "detailed"
+	Visibility string `json:"visibility,omitempty"` // e.g. "basic" or "detailed".  empty implies "basic"
+	Display    string `json:"display,omitempty"`    // e.g. "optional".  empty implies not optional
 }
 
 // SearchPreferences contains preferences for the search
