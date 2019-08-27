@@ -12,17 +12,18 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-// NewPool creates a new pool with the specified private URL. It
-// is initialy not active and has no name, description nor publicURL
-func NewPool(privateURL string) Pool {
-	return Pool{PrivateURL: privateURL,
+// NewPool creates a new pool with the specified private URL and internal name. It
+// is initialy not active and has no localization nor publicURL
+func NewPool(name string, privateURL string) Pool {
+	return Pool{Name: name, PrivateURL: privateURL,
 		Alive: false, FallbackLanguage: "en-US",
 		Translations: make(map[string]PoolDesc)}
 }
 
 // Pool defines the attributes of a search pool. Pools are initially registered
-// with only a PrivateURL. Full details are read from the /identify endpoint.
+// with PrivateURL and an internal name. Full details are read from the /identify endpoint.
 type Pool struct {
+	Name             string
 	PrivateURL       string
 	PublicURL        string
 	Alive            bool
@@ -33,12 +34,12 @@ type Pool struct {
 	Translations map[string]PoolDesc
 }
 
-// PublicPoolInfo contains public pool information that has been translated
-// to the language of the client
-type PublicPoolInfo struct {
-	PublicURL   string `json:"url"`
-	Name        string `json:"name"`
-	Description string `json:"description"`
+// LocalizedPoolInfo contains pool information that has been translated
+// to the language requested by the client (if available. Fallback is en-US)
+type LocalizedPoolInfo struct {
+	Identifier string `json:"id"` // this is a unique, internal name for the pool
+	PublicURL  string `json:"url"`
+	PoolDesc          // The diplay name and desc in a specific language
 }
 
 // PoolDesc contains the language-specific name and description of a pool
@@ -157,21 +158,22 @@ func (svc *ServiceContext) GetPoolsRequest(c *gin.Context) {
 		acceptLang = "en-US"
 	}
 
-	pools := svc.GetPublicPoolInfo(acceptLang)
+	pools := svc.GetLocalizedPoolInfo(acceptLang)
 	c.JSON(http.StatusOK, pools)
 }
 
-// GetPublicPoolInfo gets the public URL and localized  name/description for all active pools
-func (svc *ServiceContext) GetPublicPoolInfo(language string) []PublicPoolInfo {
+// GetLocalizedPoolInfo gets the internal name, public URL and localized
+// display name/description for all active pools
+func (svc *ServiceContext) GetLocalizedPoolInfo(language string) []LocalizedPoolInfo {
 	log.Printf("Get %s public pool info", language)
-	pools := make([]PublicPoolInfo, 0)
+	pools := make([]LocalizedPoolInfo, 0)
 	for _, p := range svc.Pools {
 		if p.Alive {
 			// NOTES: each in-memory pool tracks name/desc inf pairs in a map
 			// keyed by language. If the requested translation doesn't exist,
 			// look it up and cache the results. All pools have a fallback translation
-			// that is popuated upon registration. Use that if other translate fails.
-			pi := PublicPoolInfo{PublicURL: p.PublicURL}
+			// that is popuated upon registration (en-US). Use that if other translate fails.
+			localized := LocalizedPoolInfo{Identifier: p.Name, PublicURL: p.PublicURL}
 			desc := p.GetIdentity(language)
 			if desc == nil {
 				p.Identify(language)
@@ -180,9 +182,9 @@ func (svc *ServiceContext) GetPublicPoolInfo(language string) []PublicPoolInfo {
 			if desc == nil {
 				desc = p.GetIdentity(p.FallbackLanguage)
 			}
-			pi.Name = desc.Name
-			pi.Description = desc.Description
-			pools = append(pools, pi)
+			localized.Name = desc.Name
+			localized.Description = desc.Description
+			pools = append(pools, localized)
 		}
 	}
 	return pools
@@ -208,51 +210,52 @@ func (svc *ServiceContext) IsPoolActive(url string) bool {
 	return false
 }
 
-// UpdateAuthoritativePools fetches a list of current pools from a DynamoDB. New pools
+// UpdateAuthoritativePools fetches a list of current pools the V4DB. New pools
 // will be added to an in-memory cache. If an existing pool is not found in the
 // list, it will be removed from service.
 func (svc *ServiceContext) UpdateAuthoritativePools() error {
-	var sources []struct {
-		ID  int    `db:"id"`
-		URL string `db:"private_url"`
+	var pools []struct {
+		ID   int    `db:"id"`
+		Name string `db:"name"`
+		URL  string `db:"private_url"`
 	}
 	q := svc.DB.NewQuery(`select * from sources`)
-	err := q.All(&sources)
+	err := q.All(&pools)
 	if err != nil {
-		log.Printf("ERROR: Unable to get authoritative URLS: %v", err)
+		log.Printf("ERROR: Unable to get authoritative pool information: %+v", err)
 		return err
 	}
 
-	var authoritativeURLs []string
-	for _, src := range sources {
-		authoritativeURLs = append(authoritativeURLs, src.URL)
-		if svc.PoolExists(src.URL) {
+	var authoritativePools []string
+	for _, p := range pools {
+		authoritativePools = append(authoritativePools, p.Name)
+		if svc.PoolExists(p.URL) {
 			// pool already exists; no nothing
 			continue
 		}
-		log.Printf("Authoritative pools update found new pool URL %s", src.URL)
-		svc.AddPool(src.URL)
+		log.Printf("Authoritative pools update found new pool URL %s:%s", p.Name, p.URL)
+		svc.AddPool(p.Name, p.URL)
 	}
 
 	// Now see if there are any pools in memory that are no longer in the
 	// authoritatve list, they have been retired and should be dropped
-	svc.PrunePools(authoritativeURLs)
+	svc.PrunePools(authoritativePools)
 	return nil
 }
 
 // AddPool will create a new pool, ping it and add it to the in-memory pool cache if successful.
 // Pools are initially identified with default language en-US.
-func (svc *ServiceContext) AddPool(privateURL string) {
-	pool := NewPool(privateURL)
+func (svc *ServiceContext) AddPool(name string, privateURL string) {
+	pool := NewPool(name, privateURL)
 	if err := pool.Ping(); err != nil {
-		log.Printf("   * %s is not available: %s", pool.PrivateURL, err.Error())
+		log.Printf("   * %s:%s is not available: %s", pool.Name, pool.PrivateURL, err.Error())
 	} else {
 		desc := pool.Identify("en-US")
 		if desc != nil {
-			log.Printf("   * %s is alive and identified (en-US) as %s", pool.PrivateURL, desc.Name)
+			log.Printf("   * %s:%s is alive and identified (en-US) as %s", pool.Name, pool.PrivateURL, desc.Name)
 			svc.Pools = append(svc.Pools, &pool)
 		} else {
-			log.Printf("   * %s is alive, but failed identify", pool.PrivateURL)
+			log.Printf("   * %s:%s is alive, but failed identify", pool.Name, pool.PrivateURL)
 			svc.Pools = append(svc.Pools, &pool)
 		}
 	}
@@ -260,18 +263,18 @@ func (svc *ServiceContext) AddPool(privateURL string) {
 
 // PrunePools compares the in-memory pools with the authoritative pool list. Any
 // pools that are not on the authoritative list are removed.
-func (svc *ServiceContext) PrunePools(authoritativeURLs []string) {
+func (svc *ServiceContext) PrunePools(authoritativePools []string) {
 	for idx := len(svc.Pools) - 1; idx >= 0; idx-- {
-		p := svc.Pools[idx]
+		pool := svc.Pools[idx]
 		found := false
-		for _, authURL := range authoritativeURLs {
-			if authURL == p.PrivateURL || authURL == p.PublicURL {
+		for _, authPool := range authoritativePools {
+			if authPool == pool.Name {
 				found = true
 				break
 			}
 		}
 		if found == false {
-			log.Printf("Pool %s is no longer on the authoritative list. Removing", p.PrivateURL)
+			log.Printf("Pool %s:%s is no longer on the authoritative list. Removing", pool.Name, pool.PrivateURL)
 			svc.Pools = append(svc.Pools[:idx], svc.Pools[idx+1:]...)
 		}
 	}

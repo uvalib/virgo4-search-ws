@@ -51,7 +51,7 @@ func main() {
 	router.GET("/healthcheck", svc.HealthCheck)
 	api := router.Group("/api")
 	{
-		api.GET("/pools", svc.AuthMiddleware, svc.GetPoolsRequest)
+		api.GET("/pools", svc.GetPoolsRequest)
 		api.POST("/search", svc.AuthMiddleware, svc.Search)
 	}
 

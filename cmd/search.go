@@ -48,12 +48,12 @@ func NewSearchResponse(req *SearchRequest) *SearchResponse {
 
 // SearchResponse contains all search resonse data
 type SearchResponse struct {
-	Request     *SearchRequest   `json:"request"`
-	Pools       []PublicPoolInfo `json:"pools"`
-	TotalTimeMS int64            `json:"total_time_ms"`
-	TotalHits   int              `json:"total_hits"`
-	Results     []*PoolResult    `json:"pool_results"`
-	Warnings    []string         `json:"warnings"`
+	Request     *SearchRequest      `json:"request"`
+	Pools       []LocalizedPoolInfo `json:"pools"`
+	TotalTimeMS int64               `json:"total_time_ms"`
+	TotalHits   int                 `json:"total_hits"`
+	Results     []*PoolResult       `json:"pool_results"`
+	Warnings    []string            `json:"warnings"`
 }
 
 // Pagination cantains pagination info
@@ -218,7 +218,7 @@ func (svc *ServiceContext) Search(c *gin.Context) {
 	log.Printf("Pre-search, post-update pools count %d", len(svc.Pools))
 
 	// Get all public pool info in the language of the client request
-	out.Pools = svc.GetPublicPoolInfo(acceptLang)
+	out.Pools = svc.GetLocalizedPoolInfo(acceptLang)
 
 	if req.Preferences.TargetPool != "" && svc.IsPoolActive(req.Preferences.TargetPool) == false {
 		log.Printf("WARNING: Target Pool %s is not registered", req.Preferences.TargetPool)
