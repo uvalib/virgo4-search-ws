@@ -63,9 +63,18 @@ type Pagination struct {
 	Total int `json:"total"`
 }
 
+// NewPoolResult creates a new result struct
+func NewPoolResult(pool *Pool, ms int64) *PoolResult {
+	return &PoolResult{ServiceURL: pool.PublicURL, PoolName: pool.Name,
+		ElapsedMS: ms, ContentLanguage: pool.FallbackLanguage,
+		Warnings: make([]string, 0, 0), AvailableFacets: make([]string, 0, 0),
+	}
+}
+
 // PoolResult is the response from a single pool
 type PoolResult struct {
-	ServiceURL      string                 `json:"service_url"`
+	ServiceURL      string                 `json:"service_url,omitempty"`
+	PoolName        string                 `json:"pool_id,omitempty"`
 	ElapsedMS       int64                  `json:"elapsed_ms,omitempty"`
 	Pagination      Pagination             `json:"pagination"`
 	Records         []Record               `json:"record_list"`
@@ -237,7 +246,7 @@ func (svc *ServiceContext) Search(c *gin.Context) {
 	}
 
 	// Kick off all pool requests in parallel and wait for all to respond
-	channel := make(chan PoolResult)
+	channel := make(chan *PoolResult)
 	outstandingRequests := 0
 	for _, p := range svc.Pools {
 		if p.Alive == false {
@@ -261,12 +270,12 @@ func (svc *ServiceContext) Search(c *gin.Context) {
 	var contentLanguage string
 	for outstandingRequests > 0 {
 		poolResponse := <-channel
-		out.Results = append(out.Results, &poolResponse)
+		out.Results = append(out.Results, poolResponse)
 		if contentLanguage == "" {
 			contentLanguage = poolResponse.ContentLanguage
 			log.Printf("Set response Content-Language to %s", contentLanguage)
 		}
-		log.Printf("Pool %s has %d hits and status %d:%s", poolResponse.ServiceURL,
+		log.Printf("Pool %s has %d hits and status %d[%s]", poolResponse.ServiceURL,
 			poolResponse.Pagination.Total, poolResponse.StatusCode, poolResponse.StatusMessage)
 		if poolResponse.StatusCode == http.StatusOK {
 			out.TotalHits += poolResponse.Pagination.Total
@@ -293,7 +302,7 @@ func (svc *ServiceContext) Search(c *gin.Context) {
 }
 
 // Goroutine to do a pool search and return the PoolResults on the channel
-func searchPool(pool *Pool, req SearchRequest, qp SearchQP, headers map[string]string, channel chan PoolResult) {
+func searchPool(pool *Pool, req SearchRequest, qp SearchQP, headers map[string]string, channel chan *PoolResult) {
 	// Master search always uses the Private URL to communicate with pools
 	sURL := fmt.Sprintf("%s/api/search?debug=%s&intuit=%s", pool.PrivateURL, qp.debug, qp.intuit)
 	log.Printf("POST search to %s", sURL)
@@ -313,6 +322,7 @@ func searchPool(pool *Pool, req SearchRequest, qp SearchQP, headers map[string]s
 	postResp, err := client.Do(postReq)
 	elapsedNanoSec := time.Since(start)
 	elapsedMS := int64(elapsedNanoSec / time.Millisecond)
+	results := NewPoolResult(pool, elapsedMS)
 	if err != nil {
 		status := http.StatusBadRequest
 		errMsg := err.Error()
@@ -324,47 +334,38 @@ func searchPool(pool *Pool, req SearchRequest, qp SearchQP, headers map[string]s
 			errMsg = fmt.Sprintf("%s is offline", pool.PrivateURL)
 		}
 		pool.Alive = false
-		channel <- PoolResult{ServiceURL: pool.PublicURL, StatusCode: status,
-			AvailableFacets: make([]string, 0, 0), Warnings: make([]string, 0, 0),
-			StatusMessage: errMsg, ElapsedMS: elapsedMS}
+		results.StatusCode = status
+		results.StatusMessage = errMsg
+		channel <- results
 		return
 	}
 
 	defer postResp.Body.Close()
 	bodyBytes, _ := ioutil.ReadAll(postResp.Body)
 	if postResp.StatusCode != 200 {
-		channel <- PoolResult{ServiceURL: pool.PublicURL, StatusCode: postResp.StatusCode,
-			Warnings: make([]string, 0, 0), AvailableFacets: make([]string, 0, 0),
-			StatusMessage: string(bodyBytes), ElapsedMS: elapsedMS}
+		results.StatusCode = postResp.StatusCode
+		results.StatusMessage = string(bodyBytes)
+		channel <- results
 		return
 	}
 
-	var poolResults PoolResult
-	err = json.Unmarshal(bodyBytes, &poolResults)
+	err = json.Unmarshal(bodyBytes, results)
 	if err != nil {
-		channel <- PoolResult{ServiceURL: pool.PublicURL, StatusCode: http.StatusInternalServerError,
-			Warnings: make([]string, 0, 0), AvailableFacets: make([]string, 0, 0),
-			StatusMessage: "Malformed search response", ElapsedMS: elapsedMS}
+		results.StatusCode = http.StatusInternalServerError
+		results.StatusMessage = "Malformed search response"
+		channel <- results
 		return
 	}
 
 	// If we are this far, there is a valid response. Add language
-	respLang := postResp.Header.Get("Content-Language")
-	if respLang == "" {
-		respLang = postReq.Header.Get("Accept-Language")
+	results.StatusCode = http.StatusOK
+	elapsedNanoSec = time.Since(start)
+	results.ElapsedMS = int64(elapsedNanoSec / time.Millisecond)
+	results.ContentLanguage = postResp.Header.Get("Content-Language")
+	if results.ContentLanguage == "" {
+		results.ContentLanguage = postReq.Header.Get("Accept-Language")
 	}
 
-	// Add elapsed time and stick it in the master search results format
 	log.Printf("Successful pool response from %s. Elapsed Time: %d (ms)", sURL, elapsedMS)
-	poolResults.ElapsedMS = elapsedMS
-	poolResults.StatusCode = http.StatusOK
-	poolResults.ContentLanguage = respLang
-	if poolResults.Warnings == nil {
-		poolResults.Warnings = make([]string, 0, 0)
-	}
-	if poolResults.AvailableFacets == nil {
-		poolResults.AvailableFacets = make([]string, 0, 0)
-	}
-
-	channel <- poolResults
+	channel <- results
 }
