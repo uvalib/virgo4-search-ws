@@ -45,6 +45,7 @@ type LocalizedPoolInfo struct {
 // PoolDesc contains the language-specific name and description of a pool
 type PoolDesc struct {
 	Name        string `json:"name"`
+	Summary     string `json:"summary"`
 	Description string `json:"description"`
 }
 
@@ -94,6 +95,7 @@ func (p *Pool) Identify(language string) *PoolDesc {
 
 	type idResp struct {
 		Name        string `json:"name"`
+		Summary     string `json:"summary"`
 		Description string `json:"description"`
 		PublicURL   string `json:"public_url"`
 	}
@@ -101,9 +103,9 @@ func (p *Pool) Identify(language string) *PoolDesc {
 	respTxt, _ := ioutil.ReadAll(resp.Body)
 	json.Unmarshal(respTxt, &identity)
 	p.PublicURL = identity.PublicURL
-	newDesc := PoolDesc{Name: identity.Name, Description: identity.Description}
+	newDesc := PoolDesc{Name: identity.Name, Summary: identity.Summary, Description: identity.Description}
 	log.Printf("Adding %s translation %s:%s for %s", language, identity.Name,
-		identity.Description, p.PrivateURL)
+		identity.Summary, p.PrivateURL)
 	p.Translations[language] = newDesc
 	return &newDesc
 }
@@ -183,6 +185,7 @@ func (svc *ServiceContext) GetLocalizedPoolInfo(language string) []LocalizedPool
 				desc = p.GetIdentity(p.FallbackLanguage)
 			}
 			localized.Name = desc.Name
+			localized.Summary = desc.Summary
 			localized.Description = desc.Description
 			pools = append(pools, localized)
 		}
