@@ -34,8 +34,8 @@ type SearchQP struct {
 
 // VirgoFilter contains the fields for a single filter.
 type VirgoFilter struct {
-	Name  string `json:"name"`
-	Value string `json:"value"`
+	FacetID string `json:"facet_id"`
+	ValueID string `json:"value_id"`
 }
 
 // NewSearchResponse creates a new instance of a search response
@@ -67,7 +67,7 @@ type Pagination struct {
 func NewPoolResult(pool *Pool, ms int64) *PoolResult {
 	return &PoolResult{ServiceURL: pool.PublicURL, PoolName: pool.Name,
 		ElapsedMS: ms, ContentLanguage: pool.FallbackLanguage,
-		Warnings: make([]string, 0, 0), AvailableFacets: make([]string, 0, 0),
+		Warnings: make([]string, 0, 0), AvailableFacets: make([]VirgoFacet, 0, 0),
 	}
 }
 
@@ -78,7 +78,7 @@ type PoolResult struct {
 	ElapsedMS       int64                  `json:"elapsed_ms,omitempty"`
 	Pagination      Pagination             `json:"pagination"`
 	Records         []Record               `json:"record_list"`
-	AvailableFacets []string               `json:"available_facets"`     // available facets advertised to the client
+	AvailableFacets []VirgoFacet           `json:"available_facets"`     // available facets advertised to the client
 	FacetList       []VirgoFacet           `json:"facet_list,omitempty"` // facet values for client-requested facets
 	Confidence      string                 `json:"confidence,omitempty"`
 	Debug           map[string]interface{} `json:"debug"`
@@ -90,12 +90,14 @@ type PoolResult struct {
 
 // VirgoFacet contains the fields for a single facet.
 type VirgoFacet struct {
+	ID      string             `json:"id"`
 	Name    string             `json:"name"`
-	Buckets []VirgoFacetBucket `json:"buckets"`
+	Buckets []VirgoFacetBucket `json:"buckets,omitempty"`
 }
 
 // VirgoFacetBucket contains the fields for an individual bucket for a facet.
 type VirgoFacetBucket struct {
+	ID    string `json:"id"`
 	Value string `json:"value"`
 	Count int    `json:"count"`
 }
