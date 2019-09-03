@@ -28,8 +28,9 @@ type SearchRequest struct {
 
 // SearchQP defines the query params that could be passed to the pools
 type SearchQP struct {
-	debug  string
-	intuit string
+	debug   string
+	intuit  string
+	grouped string
 }
 
 // VirgoFilter contains the fields for a single filter.
@@ -77,7 +78,8 @@ type PoolResult struct {
 	PoolName        string                 `json:"pool_id,omitempty"`
 	ElapsedMS       int64                  `json:"elapsed_ms,omitempty"`
 	Pagination      Pagination             `json:"pagination"`
-	Records         []Record               `json:"record_list"`
+	Records         []Record               `json:"record_list,omitempty"`
+	Groups          []Group                `json:"group_list,omitempty"`
 	AvailableFacets []VirgoFacet           `json:"available_facets"`     // available facets advertised to the client
 	FacetList       []VirgoFacet           `json:"facet_list,omitempty"` // facet values for client-requested facets
 	Confidence      string                 `json:"confidence,omitempty"`
@@ -105,6 +107,13 @@ type VirgoFacetBucket struct {
 type Record struct {
 	Fields []RecordField          `json:"fields"`
 	Debug  map[string]interface{} `json:"debug"`
+}
+
+// Group contains the records for a single group in a search result set.
+type Group struct {
+	Value   string   `json:"value"`
+	Count   int      `json:"count"`
+	Records []Record `json:"record_list,omitempty"`
 }
 
 // RecordField contains metadata for a single field in a record.
@@ -237,7 +246,7 @@ func (svc *ServiceContext) Search(c *gin.Context) {
 	}
 
 	// grab QP config for debug or search intuit
-	qp := SearchQP{debug: c.Query("debug"), intuit: c.Query("intuit")}
+	qp := SearchQP{debug: c.Query("debug"), intuit: c.Query("intuit"), grouped: c.Query("grouped")}
 
 	// headers to send to pool
 	headers := map[string]string{
@@ -305,7 +314,7 @@ func (svc *ServiceContext) Search(c *gin.Context) {
 // Goroutine to do a pool search and return the PoolResults on the channel
 func searchPool(pool *Pool, req SearchRequest, qp SearchQP, headers map[string]string, channel chan *PoolResult) {
 	// Master search always uses the Private URL to communicate with pools
-	sURL := fmt.Sprintf("%s/api/search?debug=%s&intuit=%s", pool.PrivateURL, qp.debug, qp.intuit)
+	sURL := fmt.Sprintf("%s/api/search?debug=%s&intuit=%s&grouped=%s", pool.PrivateURL, qp.debug, qp.intuit, qp.grouped)
 	log.Printf("POST search to %s", sURL)
 	respBytes, _ := json.Marshal(req)
 	postReq, _ := http.NewRequest("POST", sURL, bytes.NewBuffer(respBytes))
