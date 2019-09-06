@@ -42,6 +42,7 @@ type VirgoFilter struct {
 // NewSearchResponse creates a new instance of a search response
 func NewSearchResponse(req *SearchRequest) *SearchResponse {
 	return &SearchResponse{Request: req,
+		Pools:    make([]*Pool, 0),
 		Results:  make([]*PoolResult, 0),
 		Warnings: make([]string, 0, 0),
 	}
@@ -49,12 +50,12 @@ func NewSearchResponse(req *SearchRequest) *SearchResponse {
 
 // SearchResponse contains all search resonse data
 type SearchResponse struct {
-	Request     *SearchRequest      `json:"request"`
-	Pools       []LocalizedPoolInfo `json:"pools"`
-	TotalTimeMS int64               `json:"total_time_ms"`
-	TotalHits   int                 `json:"total_hits"`
-	Results     []*PoolResult       `json:"pool_results"`
-	Warnings    []string            `json:"warnings"`
+	Request     *SearchRequest `json:"request"`
+	Pools       []*Pool        `json:"pools"`
+	TotalTimeMS int64          `json:"total_time_ms"`
+	TotalHits   int            `json:"total_hits"`
+	Results     []*PoolResult  `json:"pool_results"`
+	Warnings    []string       `json:"warnings"`
 }
 
 // Pagination cantains pagination info
@@ -67,8 +68,7 @@ type Pagination struct {
 // NewPoolResult creates a new result struct
 func NewPoolResult(pool *Pool, ms int64) *PoolResult {
 	return &PoolResult{ServiceURL: pool.PublicURL, PoolName: pool.Name,
-		ElapsedMS: ms, ContentLanguage: pool.FallbackLanguage,
-		Warnings: make([]string, 0, 0), AvailableFacets: make([]VirgoFacet, 0, 0),
+		ElapsedMS: ms, Warnings: make([]string, 0, 0), AvailableFacets: make([]VirgoFacet, 0, 0),
 	}
 }
 
@@ -196,7 +196,11 @@ func (s *byConfidence) Less(i, j int) bool {
 // Search queries all pools for results, collects and curates results. Responds with JSON.
 func (svc *ServiceContext) Search(c *gin.Context) {
 	acceptLang := c.GetHeader("Accept-Language")
+	if acceptLang == "" {
+		acceptLang = "en-US"
+	}
 	localizer := i18n.NewLocalizer(svc.I18NBundle, acceptLang)
+
 	var req SearchRequest
 	if err := c.BindJSON(&req); err != nil {
 		log.Printf("ERROR: unable to parse search request: %s", err.Error())
@@ -222,24 +226,20 @@ func (svc *ServiceContext) Search(c *gin.Context) {
 		return
 	}
 
-	// Just before each search, check the authoritative pool list
-	// and see if any new pools have been added, or pools have been retired.
+	// Just before each search, lookup the pools to search
 	out := NewSearchResponse(&req)
 	start := time.Now()
-	log.Printf("Pre-search, pre-update pools count %d", len(svc.Pools))
-	svc.UpdateAuthoritativePools()
-	if len(svc.Pools) == 0 {
-		log.Printf("ERROR: No search pools registered")
+	pools, err := svc.LookupPools(acceptLang)
+	if err != nil {
+		log.Printf("ERROR: unable to get search pools: %+v", err)
 		msg := localizer.MustLocalize(&i18n.LocalizeConfig{MessageID: "NoPools"})
 		c.String(http.StatusInternalServerError, msg)
 		return
 	}
-	log.Printf("Pre-search, post-update pools count %d", len(svc.Pools))
+	log.Printf("Search %d pools", len(pools))
+	out.Pools = pools
 
-	// Get all public pool info in the language of the client request
-	out.Pools = svc.GetLocalizedPoolInfo(acceptLang)
-
-	if req.Preferences.TargetPool != "" && svc.IsPoolActive(req.Preferences.TargetPool) == false {
+	if req.Preferences.TargetPool != "" && PoolExists(req.Preferences.TargetPool, pools) == false {
 		log.Printf("WARNING: Target Pool %s is not registered", req.Preferences.TargetPool)
 		msg := localizer.MustLocalize(&i18n.LocalizeConfig{MessageID: "TargetPoolUnavailable"})
 		out.Warnings = append(out.Warnings, msg)
@@ -258,14 +258,7 @@ func (svc *ServiceContext) Search(c *gin.Context) {
 	// Kick off all pool requests in parallel and wait for all to respond
 	channel := make(chan *PoolResult)
 	outstandingRequests := 0
-	for _, p := range svc.Pools {
-		if p.Alive == false {
-			if p.Ping() != nil {
-				log.Printf("Skipping %s as it is not alive", p.PublicURL)
-				continue
-			}
-		}
-
+	for _, p := range out.Pools {
 		// NOTE: the client only knows about publicURL so all excludes
 		// will be done with it as the key
 		if req.Preferences.IsExcluded(p.PublicURL) {
@@ -343,7 +336,6 @@ func searchPool(pool *Pool, req SearchRequest, qp SearchQP, headers map[string]s
 			status = http.StatusServiceUnavailable
 			errMsg = fmt.Sprintf("%s is offline", pool.PrivateURL)
 		}
-		pool.Alive = false
 		results.StatusCode = status
 		results.StatusMessage = errMsg
 		channel <- results
