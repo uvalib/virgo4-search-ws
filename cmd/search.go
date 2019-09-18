@@ -111,9 +111,10 @@ type Record struct {
 
 // Group contains the records for a single group in a search result set.
 type Group struct {
-	Value   string   `json:"value"`
-	Count   int      `json:"count"`
-	Records []Record `json:"record_list,omitempty"`
+	Value   string        `json:"value"`
+	Count   int           `json:"count"`
+	Fields  []RecordField `json:"fields,omitempty"`
+	Records []Record      `json:"record_list,omitempty"`
 }
 
 // RecordField contains metadata for a single field in a record.
