@@ -31,7 +31,6 @@ type SearchQP struct {
 	debug   string
 	intuit  string
 	grouped string
-	covers  string
 }
 
 // VirgoFilter contains the fields for a single filter.
@@ -248,7 +247,7 @@ func (svc *ServiceContext) Search(c *gin.Context) {
 	}
 
 	// grab QP config for debug, search intuit, etc.
-	qp := SearchQP{debug: c.Query("debug"), intuit: c.Query("intuit"), grouped: c.Query("grouped"), covers: c.Query("covers")}
+	qp := SearchQP{debug: c.Query("debug"), intuit: c.Query("intuit"), grouped: c.Query("grouped")}
 
 	// headers to send to pool
 	headers := map[string]string{
@@ -309,7 +308,7 @@ func (svc *ServiceContext) Search(c *gin.Context) {
 // Goroutine to do a pool search and return the PoolResults on the channel
 func searchPool(pool *Pool, req SearchRequest, qp SearchQP, headers map[string]string, channel chan *PoolResult) {
 	// Master search always uses the Private URL to communicate with pools
-	sURL := fmt.Sprintf("%s/api/search?debug=%s&intuit=%s&grouped=%s&covers=%s", pool.PrivateURL, qp.debug, qp.intuit, qp.grouped, qp.covers)
+	sURL := fmt.Sprintf("%s/api/search?debug=%s&intuit=%s&grouped=%s", pool.PrivateURL, qp.debug, qp.intuit, qp.grouped)
 	log.Printf("POST search to %s", sURL)
 	respBytes, _ := json.Marshal(req)
 	postReq, _ := http.NewRequest("POST", sURL, bytes.NewBuffer(respBytes))
