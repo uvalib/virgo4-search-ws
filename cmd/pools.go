@@ -22,7 +22,6 @@ type Pool struct {
 	PublicURL   string `json:"url" db:"public_url"`
 	Language    string `json:"-"`
 	DisplayName string `json:"name"`
-	Summary     string `json:"summary"`
 	Description string `json:"description"`
 }
 
@@ -31,7 +30,6 @@ type Pool struct {
 func (p *Pool) Identify(language string) error {
 	type idResp struct {
 		Name        string `json:"name"`
-		Summary     string `json:"summary"`
 		Description string `json:"description"`
 	}
 
@@ -61,7 +59,6 @@ func (p *Pool) Identify(language string) error {
 		json.Unmarshal(respTxt, &identity)
 		p.Language = tgtLanguage
 		p.DisplayName = identity.Name
-		p.Summary = identity.Summary
 		p.Description = identity.Description
 		poolsNS := time.Since(start)
 		log.Printf("%s identified in %s as %s. Time: %d ms", p.Name, p.Language, p.DisplayName, int64(poolsNS/time.Millisecond))
