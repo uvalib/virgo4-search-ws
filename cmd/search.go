@@ -17,122 +17,6 @@ import (
 	"github.com/uvalib/virgo4-parser/v4parser"
 )
 
-// SearchRequest contains all of the data necessary for a client seatch request
-type SearchRequest struct {
-	Query       string            `json:"query"`
-	Pagination  Pagination        `json:"pagination"`
-	Facet       string            `json:"facet"`
-	Filters     []VirgoFilter     `json:"filters"`
-	Preferences SearchPreferences `json:"preferences"`
-}
-
-// SearchQP defines the query params that could be passed to the pools
-type SearchQP struct {
-	debug   string
-	intuit  string
-	grouped string
-}
-
-// VirgoFilter contains the fields for a single filter.
-type VirgoFilter struct {
-	FacetID string `json:"facet_id"`
-	Value   string `json:"value"`
-}
-
-// NewSearchResponse creates a new instance of a search response
-func NewSearchResponse(req *SearchRequest) *SearchResponse {
-	return &SearchResponse{Request: req,
-		Pools:    make([]*Pool, 0),
-		Results:  make([]*PoolResult, 0),
-		Warnings: make([]string, 0, 0),
-	}
-}
-
-// SearchResponse contains all search resonse data
-type SearchResponse struct {
-	Request     *SearchRequest `json:"request"`
-	Pools       []*Pool        `json:"pools"`
-	TotalTimeMS int64          `json:"total_time_ms"`
-	TotalHits   int            `json:"total_hits"`
-	Results     []*PoolResult  `json:"pool_results"`
-	Warnings    []string       `json:"warnings"`
-}
-
-// Pagination cantains pagination info
-type Pagination struct {
-	Start int `json:"start"`
-	Rows  int `json:"rows"`
-	Total int `json:"total"`
-}
-
-// NewPoolResult creates a new result struct
-func NewPoolResult(pool *Pool, ms int64) *PoolResult {
-	return &PoolResult{ServiceURL: pool.PublicURL, PoolName: pool.Name,
-		ElapsedMS: ms, Warnings: make([]string, 0, 0), AvailableFacets: make([]VirgoFacet, 0, 0),
-	}
-}
-
-// PoolResult is the response from a single pool
-type PoolResult struct {
-	ServiceURL      string                 `json:"service_url,omitempty"`
-	PoolName        string                 `json:"pool_id,omitempty"`
-	ElapsedMS       int64                  `json:"elapsed_ms,omitempty"`
-	Pagination      Pagination             `json:"pagination"`
-	Records         []Record               `json:"record_list,omitempty"`
-	Groups          []Group                `json:"group_list,omitempty"`
-	AvailableFacets []VirgoFacet           `json:"available_facets"`     // available facets advertised to the client
-	FacetList       []VirgoFacet           `json:"facet_list,omitempty"` // facet values for client-requested facets
-	Confidence      string                 `json:"confidence,omitempty"`
-	Debug           map[string]interface{} `json:"debug"`
-	Warnings        []string               `json:"warnings"`
-	StatusCode      int                    `json:"status_code"`
-	StatusMessage   string                 `json:"status_msg,omitempty"`
-	ContentLanguage string                 `json:"-"`
-}
-
-// VirgoFacet contains the fields for a single facet.
-type VirgoFacet struct {
-	ID      string             `json:"id"`
-	Name    string             `json:"name"`
-	Buckets []VirgoFacetBucket `json:"buckets,omitempty"`
-}
-
-// VirgoFacetBucket contains the fields for an individual bucket for a facet.
-type VirgoFacetBucket struct {
-	Value string `json:"value"`
-	Count int    `json:"count"`
-}
-
-// Record is a summary of one search hit
-type Record struct {
-	Fields []RecordField          `json:"fields"`
-	Debug  map[string]interface{} `json:"debug"`
-}
-
-// Group contains the records for a single group in a search result set.
-type Group struct {
-	Value   string        `json:"value"`
-	Count   int           `json:"count"`
-	Fields  []RecordField `json:"fields,omitempty"`
-	Records []Record      `json:"record_list,omitempty"`
-}
-
-// RecordField contains metadata for a single field in a record.
-type RecordField struct {
-	Name       string `json:"name"`
-	Type       string `json:"type,omitempty"` // empty implies "text"
-	Label      string `json:"label"`
-	Value      string `json:"value"`
-	Visibility string `json:"visibility,omitempty"` // e.g. "basic" or "detailed".  empty implies "basic"
-	Display    string `json:"display,omitempty"`    // e.g. "optional".  empty implies not optional
-}
-
-// SearchPreferences contains preferences for the search
-type SearchPreferences struct {
-	TargetPool   string   `json:"target_pool"`
-	ExcludePools []string `json:"exclude_pool"`
-}
-
 // ConfidenceIndex will convert a string confidence into a numeric value
 // with low having the lowest value and exaxt the highest
 func (pr *PoolResult) ConfidenceIndex() int {
@@ -247,7 +131,7 @@ func (svc *ServiceContext) Search(c *gin.Context) {
 	}
 
 	// grab QP config for debug, search intuit, etc.
-	qp := SearchQP{debug: c.Query("debug"), intuit: c.Query("intuit"), grouped: c.Query("grouped")}
+	qp := SearchQP{debug: c.Query("debug"), intuit: c.Query("intuit")}
 
 	// headers to send to pool
 	headers := map[string]string{
@@ -308,10 +192,10 @@ func (svc *ServiceContext) Search(c *gin.Context) {
 // Goroutine to do a pool search and return the PoolResults on the channel
 func searchPool(pool *Pool, req SearchRequest, qp SearchQP, headers map[string]string, channel chan *PoolResult) {
 	// Master search always uses the Private URL to communicate with pools
-	sURL := fmt.Sprintf("%s/api/search?debug=%s&intuit=%s&grouped=%s", pool.PrivateURL, qp.debug, qp.intuit, qp.grouped)
+	sURL := fmt.Sprintf("%s/api/search?debug=%s&intuit=%s", pool.PrivateURL, qp.debug, qp.intuit)
 	log.Printf("POST search to %s", sURL)
-	respBytes, _ := json.Marshal(req)
-	postReq, _ := http.NewRequest("POST", sURL, bytes.NewBuffer(respBytes))
+	reqBytes, _ := json.Marshal(req)
+	postReq, _ := http.NewRequest("POST", sURL, bytes.NewBuffer(reqBytes))
 
 	for name, val := range headers {
 		postReq.Header.Set(name, val)
