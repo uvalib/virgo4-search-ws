@@ -317,7 +317,7 @@ func searchPool(pool *Pool, req SearchRequest, qp SearchQP, headers map[string]s
 		postReq.Header.Set(name, val)
 	}
 
-	timeout := time.Duration(5 * time.Second)
+	timeout := time.Duration(10 * time.Second)
 	client := http.Client{
 		Timeout: timeout,
 	}
