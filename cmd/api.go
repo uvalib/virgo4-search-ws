@@ -48,7 +48,7 @@ type PoolResult struct {
 	Groups          []Group                `json:"group_list,omitempty"`
 	AvailableFacets []VirgoFacet           `json:"available_facets"`     // available facets advertised to the client
 	FacetList       []VirgoFacet           `json:"facet_list,omitempty"` // facet values for client-requested facets
-	DefaultFacets   []VirgoDefaultFacet    `json:"default_facets"`
+	DefaultFacets   []VirgoDefaultFacet    `json:"default_facets,omitempty"`
 	Confidence      string                 `json:"confidence,omitempty"`
 	Debug           map[string]interface{} `json:"debug"`
 	Warnings        []string               `json:"warnings"`
