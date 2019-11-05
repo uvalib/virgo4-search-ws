@@ -44,38 +44,21 @@ func (p *SearchPreferences) IsExcluded(URL string) bool {
 	return false
 }
 
-// byConfidence will sort responses by confidence, then hit count
-// If a target pool is specified, it will put that one first
-type byConfidence struct {
-	results   []*PoolResult
-	targetURL string
+// byName will sort responses by name
+type byName struct {
+	results []*PoolResult
 }
 
-func (s *byConfidence) Len() int {
+func (s *byName) Len() int {
 	return len(s.results)
 }
 
-func (s *byConfidence) Swap(i, j int) {
+func (s *byName) Swap(i, j int) {
 	s.results[i], s.results[j] = s.results[j], s.results[i]
 }
 
-func (s *byConfidence) Less(i, j int) bool {
-	// bubble matching URL to top
-	if s.targetURL == s.results[i].ServiceURL {
-		return true
-	}
-	if s.targetURL == s.results[j].ServiceURL {
-		return false
-	}
-	// sort by confidence index
-	if s.results[i].ConfidenceIndex() < s.results[j].ConfidenceIndex() {
-		return false
-	}
-	if s.results[i].ConfidenceIndex() > s.results[j].ConfidenceIndex() {
-		return true
-	}
-	// confidence is equal; sort by hit count
-	return s.results[i].Pagination.Total > s.results[j].Pagination.Total
+func (s *byName) Less(i, j int) bool {
+	return s.results[i].PoolName < s.results[j].PoolName
 }
 
 // Search queries all pools for results, collects and curates results. Responds with JSON.
@@ -175,9 +158,9 @@ func (svc *ServiceContext) Search(c *gin.Context) {
 		outstandingRequests--
 	}
 
-	// Do a basic sort by tagetURL, confidence then hit count
-	confidenceSort := byConfidence{results: out.Results, targetURL: req.Preferences.TargetPool}
-	sort.Sort(&confidenceSort)
+	// sort pools by name
+	nameSort := byName{results: out.Results}
+	sort.Sort(&nameSort)
 
 	// Total time for all respones (basically the longest response)
 	elapsedNanoSec := time.Since(start)
