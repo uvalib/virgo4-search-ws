@@ -48,4 +48,5 @@ require (
 	golang.org/x/sys v0.0.0-20190904154756-749cb33beabd // indirect
 	golang.org/x/text v0.3.2
 	golang.org/x/tools v0.0.0-20190826060629-95c3470cfb70 // indirect
+	honnef.co/go/tools v0.0.1-2019.2.3 // indirect
 )
