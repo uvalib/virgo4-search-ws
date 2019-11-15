@@ -17,112 +17,6 @@ import (
 	"github.com/uvalib/virgo4-parser/v4parser"
 )
 
-// SearchRequest contains all of the data necessary for a client seatch request
-type SearchRequest struct {
-	Query       string            `json:"query"`
-	Pagination  Pagination        `json:"pagination"`
-	Facet       string            `json:"facet"`
-	Filters     []VirgoFilter     `json:"filters"`
-	Preferences SearchPreferences `json:"preferences"`
-}
-
-// SearchQP defines the query params that could be passed to the pools
-type SearchQP struct {
-	debug  string
-	intuit string
-}
-
-// VirgoFilter contains the fields for a single filter.
-type VirgoFilter struct {
-	FacetID string `json:"facet_id"`
-	Value   string `json:"value"`
-}
-
-// NewSearchResponse creates a new instance of a search response
-func NewSearchResponse(req *SearchRequest) *SearchResponse {
-	return &SearchResponse{Request: req,
-		Results:  make([]*PoolResult, 0),
-		Warnings: make([]string, 0, 0),
-	}
-}
-
-// SearchResponse contains all search resonse data
-type SearchResponse struct {
-	Request     *SearchRequest      `json:"request"`
-	Pools       []LocalizedPoolInfo `json:"pools"`
-	TotalTimeMS int64               `json:"total_time_ms"`
-	TotalHits   int                 `json:"total_hits"`
-	Results     []*PoolResult       `json:"pool_results"`
-	Warnings    []string            `json:"warnings"`
-}
-
-// Pagination cantains pagination info
-type Pagination struct {
-	Start int `json:"start"`
-	Rows  int `json:"rows"`
-	Total int `json:"total"`
-}
-
-// NewPoolResult creates a new result struct
-func NewPoolResult(pool *Pool, ms int64) *PoolResult {
-	return &PoolResult{ServiceURL: pool.PublicURL, PoolName: pool.Name,
-		ElapsedMS: ms, ContentLanguage: pool.FallbackLanguage,
-		Warnings: make([]string, 0, 0), AvailableFacets: make([]VirgoFacet, 0, 0),
-	}
-}
-
-// PoolResult is the response from a single pool
-type PoolResult struct {
-	ServiceURL      string                 `json:"service_url,omitempty"`
-	PoolName        string                 `json:"pool_id,omitempty"`
-	ElapsedMS       int64                  `json:"elapsed_ms,omitempty"`
-	Pagination      Pagination             `json:"pagination"`
-	Records         []Record               `json:"record_list"`
-	AvailableFacets []VirgoFacet           `json:"available_facets"`     // available facets advertised to the client
-	FacetList       []VirgoFacet           `json:"facet_list,omitempty"` // facet values for client-requested facets
-	Confidence      string                 `json:"confidence,omitempty"`
-	Debug           map[string]interface{} `json:"debug"`
-	Warnings        []string               `json:"warnings"`
-	StatusCode      int                    `json:"status_code"`
-	StatusMessage   string                 `json:"status_msg,omitempty"`
-	ContentLanguage string                 `json:"-"`
-}
-
-// VirgoFacet contains the fields for a single facet.
-type VirgoFacet struct {
-	ID      string             `json:"id"`
-	Name    string             `json:"name"`
-	Buckets []VirgoFacetBucket `json:"buckets,omitempty"`
-}
-
-// VirgoFacetBucket contains the fields for an individual bucket for a facet.
-type VirgoFacetBucket struct {
-	Value string `json:"value"`
-	Count int    `json:"count"`
-}
-
-// Record is a summary of one search hit
-type Record struct {
-	Fields []RecordField          `json:"fields"`
-	Debug  map[string]interface{} `json:"debug"`
-}
-
-// RecordField contains metadata for a single field in a record.
-type RecordField struct {
-	Name       string `json:"name"`
-	Type       string `json:"type,omitempty"` // empty implies "text"
-	Label      string `json:"label"`
-	Value      string `json:"value"`
-	Visibility string `json:"visibility,omitempty"` // e.g. "basic" or "detailed".  empty implies "basic"
-	Display    string `json:"display,omitempty"`    // e.g. "optional".  empty implies not optional
-}
-
-// SearchPreferences contains preferences for the search
-type SearchPreferences struct {
-	TargetPool   string   `json:"target_pool"`
-	ExcludePools []string `json:"exclude_pool"`
-}
-
 // ConfidenceIndex will convert a string confidence into a numeric value
 // with low having the lowest value and exaxt the highest
 func (pr *PoolResult) ConfidenceIndex() int {
@@ -148,6 +42,23 @@ func (p *SearchPreferences) IsExcluded(URL string) bool {
 		}
 	}
 	return false
+}
+
+// byName will sort responses by name
+type byName struct {
+	results []*PoolResult
+}
+
+func (s *byName) Len() int {
+	return len(s.results)
+}
+
+func (s *byName) Swap(i, j int) {
+	s.results[i], s.results[j] = s.results[j], s.results[i]
+}
+
+func (s *byName) Less(i, j int) bool {
+	return s.results[i].PoolName < s.results[j].PoolName
 }
 
 // byConfidence will sort responses by confidence, then hit count
@@ -187,7 +98,11 @@ func (s *byConfidence) Less(i, j int) bool {
 // Search queries all pools for results, collects and curates results. Responds with JSON.
 func (svc *ServiceContext) Search(c *gin.Context) {
 	acceptLang := c.GetHeader("Accept-Language")
+	if acceptLang == "" {
+		acceptLang = "en-US"
+	}
 	localizer := i18n.NewLocalizer(svc.I18NBundle, acceptLang)
+
 	var req SearchRequest
 	if err := c.BindJSON(&req); err != nil {
 		log.Printf("ERROR: unable to parse search request: %s", err.Error())
@@ -213,30 +128,26 @@ func (svc *ServiceContext) Search(c *gin.Context) {
 		return
 	}
 
-	// Just before each search, check the authoritative pool list
-	// and see if any new pools have been added, or pools have been retired.
+	// Just before each search, lookup the pools to search
 	out := NewSearchResponse(&req)
 	start := time.Now()
-	log.Printf("Pre-search, pre-update pools count %d", len(svc.Pools))
-	svc.UpdateAuthoritativePools()
-	if len(svc.Pools) == 0 {
-		log.Printf("ERROR: No search pools registered")
+	pools, err := svc.LookupPools(acceptLang)
+	if err != nil {
+		log.Printf("ERROR: unable to get search pools: %+v", err)
 		msg := localizer.MustLocalize(&i18n.LocalizeConfig{MessageID: "NoPools"})
 		c.String(http.StatusInternalServerError, msg)
 		return
 	}
-	log.Printf("Pre-search, post-update pools count %d", len(svc.Pools))
+	log.Printf("Search %d pools", len(pools))
+	out.Pools = pools
 
-	// Get all public pool info in the language of the client request
-	out.Pools = svc.GetLocalizedPoolInfo(acceptLang)
-
-	if req.Preferences.TargetPool != "" && svc.IsPoolActive(req.Preferences.TargetPool) == false {
+	if req.Preferences.TargetPool != "" && PoolExists(req.Preferences.TargetPool, pools) == false {
 		log.Printf("WARNING: Target Pool %s is not registered", req.Preferences.TargetPool)
 		msg := localizer.MustLocalize(&i18n.LocalizeConfig{MessageID: "TargetPoolUnavailable"})
 		out.Warnings = append(out.Warnings, msg)
 	}
 
-	// grab QP config for debug or search intuit
+	// grab QP config for debug, search intuit, etc.
 	qp := SearchQP{debug: c.Query("debug"), intuit: c.Query("intuit")}
 
 	// headers to send to pool
@@ -249,14 +160,7 @@ func (svc *ServiceContext) Search(c *gin.Context) {
 	// Kick off all pool requests in parallel and wait for all to respond
 	channel := make(chan *PoolResult)
 	outstandingRequests := 0
-	for _, p := range svc.Pools {
-		if p.Alive == false {
-			if p.Ping() != nil {
-				log.Printf("Skipping %s as it is not alive", p.PublicURL)
-				continue
-			}
-		}
-
+	for _, p := range out.Pools {
 		// NOTE: the client only knows about publicURL so all excludes
 		// will be done with it as the key
 		if req.Preferences.IsExcluded(p.PublicURL) {
@@ -288,9 +192,10 @@ func (svc *ServiceContext) Search(c *gin.Context) {
 		outstandingRequests--
 	}
 
-	// Do a basic sort by tagetURL, confidence then hit count
-	confidenceSort := byConfidence{results: out.Results, targetURL: req.Preferences.TargetPool}
-	sort.Sort(&confidenceSort)
+	// sort pool results
+	// poolSort := byName{results: out.Results}
+	poolSort := byConfidence{results: out.Results, targetURL: req.Preferences.TargetPool}
+	sort.Sort(&poolSort)
 
 	// Total time for all respones (basically the longest response)
 	elapsedNanoSec := time.Since(start)
@@ -307,14 +212,14 @@ func searchPool(pool *Pool, req SearchRequest, qp SearchQP, headers map[string]s
 	// Master search always uses the Private URL to communicate with pools
 	sURL := fmt.Sprintf("%s/api/search?debug=%s&intuit=%s", pool.PrivateURL, qp.debug, qp.intuit)
 	log.Printf("POST search to %s", sURL)
-	respBytes, _ := json.Marshal(req)
-	postReq, _ := http.NewRequest("POST", sURL, bytes.NewBuffer(respBytes))
+	reqBytes, _ := json.Marshal(req)
+	postReq, _ := http.NewRequest("POST", sURL, bytes.NewBuffer(reqBytes))
 
 	for name, val := range headers {
 		postReq.Header.Set(name, val)
 	}
 
-	timeout := time.Duration(5 * time.Second)
+	timeout := time.Duration(10 * time.Second)
 	client := http.Client{
 		Timeout: timeout,
 	}
@@ -334,7 +239,6 @@ func searchPool(pool *Pool, req SearchRequest, qp SearchQP, headers map[string]s
 			status = http.StatusServiceUnavailable
 			errMsg = fmt.Sprintf("%s is offline", pool.PrivateURL)
 		}
-		pool.Alive = false
 		results.StatusCode = status
 		results.StatusMessage = errMsg
 		channel <- results

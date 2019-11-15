@@ -6,7 +6,6 @@ import (
 	"net/http"
 	"path/filepath"
 	"strings"
-	"time"
 
 	"github.com/BurntSushi/toml"
 	"github.com/gin-gonic/gin"
@@ -20,7 +19,6 @@ import (
 type ServiceContext struct {
 	Version    string
 	DB         *dbx.DB
-	Pools      []*Pool
 	I18NBundle *i18n.Bundle
 }
 
@@ -29,7 +27,7 @@ type ServiceContext struct {
 // Any errors are FATAL.
 func InitializeService(version string, cfg *ServiceConfig) *ServiceContext {
 	log.Printf("Initializing Service")
-	svc := ServiceContext{Version: version, Pools: make([]*Pool, 0)}
+	svc := ServiceContext{Version: version}
 
 	log.Printf("Connect to Postgres")
 	connStr := fmt.Sprintf("user=%s password=%s dbname=%s host=%s port=%d sslmode=disable",
@@ -46,28 +44,6 @@ func InitializeService(version string, cfg *ServiceConfig) *ServiceContext {
 	svc.I18NBundle.RegisterUnmarshalFunc("toml", toml.Unmarshal)
 	svc.I18NBundle.MustLoadMessageFile("./i18n/active.en.toml")
 	svc.I18NBundle.MustLoadMessageFile("./i18n/active.es.toml")
-
-	log.Printf("Init search pools")
-	err = svc.UpdateAuthoritativePools()
-	if err != nil {
-		log.Fatalf("Unable to initialize search pools: %s", err.Error())
-	}
-
-	// Start a ticker to periodically poll pools and mark them
-	// active or inactive. The weird syntax puts the polling of
-	// the ticker channel an a goroutine so it doesn't block
-	log.Printf("Start pool hearbeat ticker")
-	ticker := time.NewTicker(time.Minute)
-	go func() {
-		for range ticker.C {
-			log.Printf("Pool check heartbeat; checking %d pools.", len(svc.Pools))
-			for _, p := range svc.Pools {
-				if err := p.Ping(); err != nil {
-					log.Printf("   * %s failed ping: %s", p.PrivateURL, err.Error())
-				}
-			}
-		}
-	}()
 
 	return &svc
 }
@@ -93,10 +69,6 @@ func (svc *ServiceContext) GetVersion(c *gin.Context) {
 
 // HealthCheck reports the health of the serivce
 func (svc *ServiceContext) HealthCheck(c *gin.Context) {
-	if len(svc.Pools) == 0 {
-		c.String(http.StatusInternalServerError, "No pools registered")
-		return
-	}
 	type hcResp struct {
 		Healthy bool   `json:"healthy"`
 		Message string `json:"message,omitempty"`
@@ -112,20 +84,7 @@ func (svc *ServiceContext) HealthCheck(c *gin.Context) {
 		hcMap["postgres"] = hcResp{Healthy: true}
 	}
 
-	healthyCount := 0
-	for _, p := range svc.Pools {
-		if err := p.Ping(); err != nil {
-			hcMap[p.PrivateURL] = hcResp{Healthy: false, Message: err.Error()}
-		} else {
-			hcMap[p.PrivateURL] = hcResp{Healthy: true}
-			healthyCount++
-		}
-	}
-	if healthyCount == 0 {
-		c.String(http.StatusInternalServerError, fmt.Sprintf("%d pools registered, all report errors.", len(svc.Pools)))
-	} else {
-		c.JSON(http.StatusOK, hcMap)
-	}
+	c.JSON(http.StatusOK, hcMap)
 }
 
 // getBearerToken is a helper to extract the user auth token from the Auth header
