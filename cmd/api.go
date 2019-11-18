@@ -17,8 +17,11 @@ type SearchQP struct {
 
 // VirgoFilter contains the fields for a single filter.
 type VirgoFilter struct {
-	FacetID string `json:"facet_id"`
-	Value   string `json:"value"`
+	PoolID string `json:"pool_id"`
+	Facets []struct {
+		FacetID string `json:"facet_id"`
+		Value   string `json:"value"`
+	}
 }
 
 // SearchResponse contains all search resonse data
