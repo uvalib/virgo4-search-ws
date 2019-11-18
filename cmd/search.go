@@ -212,7 +212,19 @@ func searchPool(pool *Pool, req SearchRequest, qp SearchQP, headers map[string]s
 	// Master search always uses the Private URL to communicate with pools
 	sURL := fmt.Sprintf("%s/api/search?debug=%s&intuit=%s", pool.PrivateURL, qp.debug, qp.intuit)
 	log.Printf("POST search to %s", sURL)
-	reqBytes, _ := json.Marshal(req)
+
+	// only send filter group applicable to this pool (if any)
+	poolReq := req
+	poolReq.Filters = []VirgoFilter{}
+
+	for _, filterGroup := range req.Filters {
+		if filterGroup.PoolID == pool.Name {
+			poolReq.Filters = append(poolReq.Filters, filterGroup)
+			break
+		}
+	}
+
+	reqBytes, _ := json.Marshal(poolReq)
 	postReq, _ := http.NewRequest("POST", sURL, bytes.NewBuffer(reqBytes))
 
 	for name, val := range headers {
