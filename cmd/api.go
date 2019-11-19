@@ -20,7 +20,7 @@ type VirgoFilter struct {
 	Facets []struct {
 		FacetID string `json:"facet_id"`
 		Value   string `json:"value"`
-	}
+	} `json:"facets"`
 }
 
 // SearchResponse contains all search resonse data
