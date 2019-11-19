@@ -4,7 +4,6 @@ package main
 type SearchRequest struct {
 	Query       string            `json:"query"`
 	Pagination  Pagination        `json:"pagination"`
-	Facet       string            `json:"facet"`
 	Filters     []VirgoFilter     `json:"filters"`
 	Preferences SearchPreferences `json:"preferences"`
 }
@@ -49,9 +48,7 @@ type PoolResult struct {
 	Pagination      Pagination             `json:"pagination"`
 	Records         []Record               `json:"record_list,omitempty"`
 	Groups          []Group                `json:"group_list,omitempty"`
-	AvailableFacets []VirgoFacet           `json:"available_facets"`     // available facets advertised to the client
 	FacetList       []VirgoFacet           `json:"facet_list,omitempty"` // facet values for client-requested facets
-	DefaultFacets   []VirgoDefaultFacet    `json:"default_facets,omitempty"`
 	Confidence      string                 `json:"confidence,omitempty"`
 	Debug           map[string]interface{} `json:"debug"`
 	Warnings        []string               `json:"warnings"`
@@ -69,8 +66,9 @@ type VirgoFacet struct {
 
 // VirgoFacetBucket contains the fields for an individual bucket for a facet.
 type VirgoFacetBucket struct {
-	Value string `json:"value"`
-	Count int    `json:"count"`
+	Value    string `json:"value"`
+	Count    int    `json:"count"`
+	Selected bool   `json:"selected"`
 }
 
 // VirgoDefaultFacet contains fields for a default facet.
@@ -123,6 +121,6 @@ func NewSearchResponse(req *SearchRequest) *SearchResponse {
 // NewPoolResult creates a new result struct
 func NewPoolResult(pool *Pool, ms int64) *PoolResult {
 	return &PoolResult{ServiceURL: pool.PublicURL, PoolName: pool.Name,
-		ElapsedMS: ms, Warnings: make([]string, 0, 0), AvailableFacets: make([]VirgoFacet, 0, 0),
+		ElapsedMS: ms, Warnings: make([]string, 0, 0),
 	}
 }
