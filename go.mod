@@ -17,7 +17,7 @@ require (
 	github.com/nicksnyder/go-i18n/v2 v2.0.3
 	github.com/prometheus/client_golang v1.3.0
 	github.com/prometheus/common v0.9.1 // indirect
-	github.com/uvalib/virgo4-parser v0.0.0-20200123171740-9a368d5a194c
+	github.com/uvalib/virgo4-parser v0.0.0-20200123190734-0deba962211c
 	github.com/zsais/go-gin-prometheus v0.1.0
 	golang.org/x/sys v0.0.0-20200122134326-e047566fdf82 // indirect
 	golang.org/x/text v0.3.2
