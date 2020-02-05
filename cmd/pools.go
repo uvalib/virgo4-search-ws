@@ -23,6 +23,8 @@ type Pool struct {
 	Language    string `json:"-"`
 	DisplayName string `json:"name"`
 	Description string `json:"description"`
+	LogoURL     string `json:"logo_url,omitempty" db:"-"`
+	ExternalURL string `json:"external_url,omitempty" db:"-"`
 }
 
 // Identify will call the pool /identify endpoint to get full pool details in the target language
@@ -31,6 +33,8 @@ func (p *Pool) Identify(language string) error {
 	type idResp struct {
 		Name        string `json:"name"`
 		Description string `json:"description"`
+		LogoURL     string `json:"logo_url,omitempty" db:"-"`
+		ExternalURL string `json:"external_url,omitempty" db:"-"`
 	}
 
 	timeout := time.Duration(2 * time.Second)
@@ -60,6 +64,8 @@ func (p *Pool) Identify(language string) error {
 		p.Language = tgtLanguage
 		p.DisplayName = identity.Name
 		p.Description = identity.Description
+		p.ExternalURL = identity.ExternalURL
+		p.LogoURL = identity.LogoURL
 		poolsNS := time.Since(start)
 		log.Printf("%s identified in %s as %s. Time: %d ms", p.Name, p.Language, p.DisplayName, int64(poolsNS/time.Millisecond))
 		return nil
