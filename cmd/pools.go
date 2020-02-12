@@ -16,27 +16,31 @@ import (
 // Pool defines the attributes of a search pool. Pools are initially registered
 // with PrivateURL and an internal name. Full details are read from the /identify endpoint.
 type Pool struct {
-	ID          int    `json:"-" db:"id"`
-	Name        string `json:"id" db:"name"`
-	PrivateURL  string `json:"-" db:"private_url"`
-	PublicURL   string `json:"url" db:"public_url"`
-	Language    string `json:"-"`
-	DisplayName string `json:"name"`
-	Description string `json:"description"`
-	LogoURL     string `json:"logo_url,omitempty" db:"-"`
-	ExternalURL string `json:"external_url,omitempty" db:"-"`
+	ID          int             `json:"-" db:"id"`
+	Name        string          `json:"id" db:"name"`
+	PrivateURL  string          `json:"-" db:"private_url"`
+	PublicURL   string          `json:"url" db:"public_url"`
+	Language    string          `json:"-"`
+	DisplayName string          `json:"name"`
+	Description string          `json:"description"`
+	Attributes  []PoolAttribute `json:"attributes,omitempty"`
+}
+
+// PoolAttribute defines a sungle attribute that a pool may support
+type PoolAttribute struct {
+	Name      string `json:"name"`
+	Supported bool   `json:"supported"`
+	Value     string `json:"value,omitempty"`
 }
 
 // Identify will call the pool /identify endpoint to get full pool details in the target language
 // If a translation for the target language cannot be found, return en-US  if possible.
 func (p *Pool) Identify(language string) error {
 	type idResp struct {
-		Name        string `json:"name"`
-		Description string `json:"description"`
-		LogoURL     string `json:"logo_url,omitempty" db:"-"`
-		ExternalURL string `json:"external_url,omitempty" db:"-"`
+		Name        string          `json:"name"`
+		Description string          `json:"description"`
+		Attributes  []PoolAttribute `json:"attributes,omitempty"`
 	}
-
 	timeout := time.Duration(2 * time.Second)
 	client := http.Client{
 		Timeout: timeout,
@@ -64,8 +68,7 @@ func (p *Pool) Identify(language string) error {
 		p.Language = tgtLanguage
 		p.DisplayName = identity.Name
 		p.Description = identity.Description
-		p.ExternalURL = identity.ExternalURL
-		p.LogoURL = identity.LogoURL
+		p.Attributes = identity.Attributes
 		poolsNS := time.Since(start)
 		log.Printf("%s identified in %s as %s. Time: %d ms", p.Name, p.Language, p.DisplayName, int64(poolsNS/time.Millisecond))
 		return nil

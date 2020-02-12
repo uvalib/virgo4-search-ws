@@ -4,6 +4,8 @@ GOCLEAN = $(GOCMD) clean
 GOTEST = $(GOCMD) test
 GOFMT = $(GOCMD) fmt
 GOVET = $(GOCMD) vet
+GOGET = $(GOCMD) get
+GOMOD = $(GOCMD) mod
 
 build: darwin 
 
@@ -26,6 +28,11 @@ fmt:
 
 vet:
 	cd cmd; $(GOVET)
+
+dep:
+	$(GOGET) -u ./cmd/...
+	$(GOMOD) tidy
+	$(GOMOD) verify
 
 check:
 	go get honnef.co/go/tools/cmd/staticcheck
