@@ -39,6 +39,7 @@ func (p *Pool) Identify(language string) error {
 	type idResp struct {
 		Name        string          `json:"name"`
 		Description string          `json:"description"`
+		Mode        string          `json:"mode,omitempty"`
 		Attributes  []PoolAttribute `json:"attributes,omitempty"`
 	}
 	timeout := time.Duration(2 * time.Second)
