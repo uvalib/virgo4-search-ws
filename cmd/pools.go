@@ -50,7 +50,12 @@ func (p *Pool) Identify(language string) error {
 	languages := []string{language, "en-US"}
 	start := time.Now()
 	for _, tgtLanguage := range languages {
-		idRequest, _ := http.NewRequest("GET", URL, nil)
+		log.Printf("Request identity information from: %s", URL)
+		idRequest, reqErr := http.NewRequest("GET", URL, nil)
+		if reqErr != nil {
+			log.Printf("ERROR: Unable to generate identify request for %s", URL)
+			continue
+		}
 		idRequest.Header.Set("Accept-Language", tgtLanguage)
 		resp, err := client.Do(idRequest)
 		if err != nil {
