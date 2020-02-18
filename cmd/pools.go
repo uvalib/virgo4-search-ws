@@ -23,6 +23,7 @@ type Pool struct {
 	Language    string          `json:"-"`
 	DisplayName string          `json:"name"`
 	Description string          `json:"description"`
+	Mode        string          `json:"mode,omitempty"`
 	Attributes  []PoolAttribute `json:"attributes,omitempty"`
 }
 
@@ -74,6 +75,7 @@ func (p *Pool) Identify(language string) error {
 		p.Language = tgtLanguage
 		p.DisplayName = identity.Name
 		p.Description = identity.Description
+		p.Mode = identity.Mode
 		p.Attributes = identity.Attributes
 		poolsNS := time.Since(start)
 		log.Printf("%s identified in %s as %s. Time: %d ms", p.Name, p.Language, p.DisplayName, int64(poolsNS/time.Millisecond))
