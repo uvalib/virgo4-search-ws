@@ -102,6 +102,7 @@ type RecordField struct {
 	Visibility string `json:"visibility,omitempty"` // e.g. "basic" or "detailed".  empty implies "basic"
 	Display    string `json:"display,omitempty"`    // e.g. "optional".  empty implies not optional
 	Provider   string `json:"provider,omitempty"`   // for URLs (e.g. "hathitrust", "proquest")
+	Item       string `json:"item,omitempty"`       // for certain URLs (currently hathitrust)
 }
 
 // SearchPreferences contains preferences for the search
