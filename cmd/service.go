@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"github.com/BurntSushi/toml"
 	"github.com/gin-gonic/gin"
@@ -17,9 +18,10 @@ import (
 
 // ServiceContext contains common data used by all handlers
 type ServiceContext struct {
-	Version    string
-	DB         *dbx.DB
-	I18NBundle *i18n.Bundle
+	Version      string
+	DB           *dbx.DB
+	SuggestorURL string
+	I18NBundle   *i18n.Bundle
 }
 
 // InitializeService will initialize the service context based on the config parameters.
@@ -27,7 +29,7 @@ type ServiceContext struct {
 // Any errors are FATAL.
 func InitializeService(version string, cfg *ServiceConfig) *ServiceContext {
 	log.Printf("Initializing Service")
-	svc := ServiceContext{Version: version}
+	svc := ServiceContext{Version: version, SuggestorURL: cfg.SuggestorURL}
 
 	log.Printf("Connect to Postgres")
 	connStr := fmt.Sprintf("user=%s password=%s dbname=%s host=%s port=%d sslmode=disable",
@@ -82,6 +84,21 @@ func (svc *ServiceContext) HealthCheck(c *gin.Context) {
 		hcMap["postgres"] = hcResp{Healthy: false, Message: err.Error()}
 	} else {
 		hcMap["postgres"] = hcResp{Healthy: true}
+	}
+
+	if svc.SuggestorURL != "" {
+		timeout := time.Duration(5 * time.Second)
+		client := http.Client{
+			Timeout: timeout,
+		}
+		apiURL := fmt.Sprintf("%s/version", svc.SuggestorURL)
+		_, err := client.Get(apiURL)
+		if err != nil {
+			log.Printf("ERROR: Suggestor %s ping failed: %s", svc.SuggestorURL, err.Error())
+			hcMap["suggestor"] = hcResp{Healthy: false, Message: err.Error()}
+		} else {
+			hcMap["suggestor"] = hcResp{Healthy: true}
+		}
 	}
 
 	c.JSON(http.StatusOK, hcMap)

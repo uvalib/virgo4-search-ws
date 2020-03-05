@@ -7,12 +7,13 @@ import (
 
 // ServiceConfig defines all of the archives transfer service configuration paramaters
 type ServiceConfig struct {
-	DBHost string
-	DBPort int
-	DBName string
-	DBUser string
-	DBPass string
-	Port   int
+	SuggestorURL string
+	DBHost       string
+	DBPort       int
+	DBName       string
+	DBUser       string
+	DBPass       string
+	Port         int
 }
 
 // LoadConfiguration will load the service configuration from env/cmdline
@@ -26,8 +27,15 @@ func LoadConfiguration() *ServiceConfig {
 	flag.StringVar(&cfg.DBName, "dbname", "virgo4", "Database name")
 	flag.StringVar(&cfg.DBUser, "dbuser", "v4user", "Database user")
 	flag.StringVar(&cfg.DBPass, "dbpass", "pass", "Database password")
+	flag.StringVar(&cfg.SuggestorURL, "suggestor", "", "Suggestor service URL")
 
 	flag.Parse()
+
+	if cfg.SuggestorURL == "" {
+		log.Fatal("suggestor param is required")
+	} else {
+		log.Printf("Suggestor API endpoint: %s", cfg.SuggestorURL)
+	}
 
 	return &cfg
 }
