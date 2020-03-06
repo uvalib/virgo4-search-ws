@@ -83,6 +83,7 @@ func (svc *ServiceContext) HealthCheck(c *gin.Context) {
 	var total int
 	err := tq.Row(&total)
 	if err != nil {
+		log.Printf("ERROR: Failed response from PSQL healthcheck: %s", err.Error())
 		hcMap["postgres"] = hcResp{Healthy: false, Message: err.Error()}
 	} else {
 		hcMap["postgres"] = hcResp{Healthy: true}
