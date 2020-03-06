@@ -1,7 +1,9 @@
 package main
 
 import (
+	"bytes"
 	"fmt"
+	"io/ioutil"
 	"log"
 	"net/http"
 	"path/filepath"
@@ -130,4 +132,62 @@ func (svc *ServiceContext) AuthMiddleware(c *gin.Context) {
 	// do something with token
 
 	log.Printf("got bearer token: [%s]", token)
+}
+
+type timedResponse struct {
+	StatusCode      int
+	ContentLanguage string
+	Response        []byte
+	ElapsedMS       int64
+}
+
+func servicePost(url string, body []byte, headers map[string]string) timedResponse {
+	log.Printf("POST %s: %s", url, body)
+	postReq, _ := http.NewRequest("POST", url, bytes.NewBuffer(body))
+	for name, val := range headers {
+		postReq.Header.Set(name, val)
+	}
+
+	timeout := time.Duration(10 * time.Second)
+	client := http.Client{
+		Timeout: timeout,
+	}
+	start := time.Now()
+	postResp, err := client.Do(postReq)
+	elapsedNanoSec := time.Since(start)
+	elapsedMS := int64(elapsedNanoSec / time.Millisecond)
+	resp := timedResponse{ElapsedMS: elapsedMS}
+	if err != nil {
+		resp.Response = []byte(err.Error())
+		resp.StatusCode = postResp.StatusCode
+		if strings.Contains(err.Error(), "Timeout") {
+			resp.StatusCode = http.StatusRequestTimeout
+			resp.Response = []byte(fmt.Sprintf("POST %s search timed out", url))
+		} else if strings.Contains(err.Error(), "connection refused") {
+			resp.StatusCode = http.StatusServiceUnavailable
+			resp.Response = []byte(fmt.Sprintf("%s is offline", url))
+		}
+		log.Printf("ERROR: Failed response from POST %s - %d:%s. Elapsed Time: %d (ms)",
+			url, postResp.StatusCode, resp.Response, elapsedMS)
+	} else {
+		defer postResp.Body.Close()
+		bodyBytes, _ := ioutil.ReadAll(postResp.Body)
+		resp.StatusCode = postResp.StatusCode
+		resp.Response = bodyBytes
+		if resp.StatusCode != http.StatusOK {
+			log.Printf("ERROR: Failed response from POST %s - %d:%s. Elapsed Time: %d (ms)",
+				url, postResp.StatusCode, resp.Response, elapsedMS)
+		} else {
+			log.Printf("Successful response from POST %s. Elapsed Time: %d (ms)", url, elapsedMS)
+			resp.ContentLanguage = postResp.Header.Get("Content-Language")
+			if resp.ContentLanguage == "" {
+				resp.ContentLanguage = postReq.Header.Get("Accept-Language")
+			}
+			if resp.ContentLanguage == "" {
+				resp.ContentLanguage = "en-US"
+			}
+		}
+	}
+
+	return resp
 }

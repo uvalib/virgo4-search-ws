@@ -1,14 +1,11 @@
 package main
 
 import (
-	"bytes"
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
 	"log"
 	"net/http"
 	"sort"
-	"strings"
 	"time"
 
 	"github.com/nicksnyder/go-i18n/v2/i18n"
@@ -95,7 +92,8 @@ func (s *byConfidence) Less(i, j int) bool {
 	return s.results[i].Pagination.Total > s.results[j].Pagination.Total
 }
 
-// Search queries all pools for results, collects and curates results. Responds with JSON.
+// Search queries all pools for results, collects and curates results. It will also send the query
+// to the suggestor service and return suggested search terms. Response is JSON
 func (svc *ServiceContext) Search(c *gin.Context) {
 	acceptLang := c.GetHeader("Accept-Language")
 	if acceptLang == "" {
@@ -157,6 +155,10 @@ func (svc *ServiceContext) Search(c *gin.Context) {
 		"Authorization":   c.GetHeader("Authorization"),
 	}
 
+	sugChannel := make(chan []Suggestion)
+	sugURL := fmt.Sprintf("%s/api/suggest", svc.SuggestorURL)
+	go getSuggestions(sugURL, req.Query, headers, sugChannel)
+
 	// Kick off all pool requests in parallel and wait for all to respond
 	channel := make(chan *PoolResult)
 	outstandingRequests := 0
@@ -192,6 +194,8 @@ func (svc *ServiceContext) Search(c *gin.Context) {
 		outstandingRequests--
 	}
 
+	out.Suggestions = <-sugChannel
+
 	// sort pool results
 	// poolSort := byName{results: out.Results}
 	poolSort := byConfidence{results: out.Results, targetURL: req.Preferences.TargetPool}
@@ -207,11 +211,36 @@ func (svc *ServiceContext) Search(c *gin.Context) {
 	c.JSON(http.StatusOK, out)
 }
 
+func getSuggestions(url string, query string, headers map[string]string, channel chan []Suggestion) {
+	var reqStruct struct {
+		Query string
+	}
+	reqStruct.Query = query
+	reqBytes, _ := json.Marshal(reqStruct)
+	resp := servicePost(url, reqBytes, headers)
+	if resp.StatusCode != http.StatusOK {
+		channel <- make([]Suggestion, 0)
+		return
+	}
+
+	log.Printf("Raw suggestor response: %s", resp.Response)
+	var respStruct struct {
+		Suggestions []Suggestion
+	}
+	err := json.Unmarshal(resp.Response, &respStruct)
+	if err != nil {
+		log.Printf("ERROR: malformed suggestor response: %s", err.Error())
+		channel <- make([]Suggestion, 0)
+		return
+	}
+
+	channel <- respStruct.Suggestions
+}
+
 // Goroutine to do a pool search and return the PoolResults on the channel
 func searchPool(pool *Pool, req SearchRequest, qp SearchQP, headers map[string]string, channel chan *PoolResult) {
 	// Master search always uses the Private URL to communicate with pools
 	sURL := fmt.Sprintf("%s/api/search?debug=%s&intuit=%s", pool.PrivateURL, qp.debug, qp.intuit)
-	log.Printf("POST search to %s", sURL)
 
 	// only send filter group applicable to this pool (if any)
 	poolReq := req
@@ -225,48 +254,16 @@ func searchPool(pool *Pool, req SearchRequest, qp SearchQP, headers map[string]s
 	}
 
 	reqBytes, _ := json.Marshal(poolReq)
-	postReq, _ := http.NewRequest("POST", sURL, bytes.NewBuffer(reqBytes))
-
-	for name, val := range headers {
-		postReq.Header.Set(name, val)
-	}
-
-	timeout := time.Duration(10 * time.Second)
-	client := http.Client{
-		Timeout: timeout,
-	}
-
-	start := time.Now()
-	postResp, err := client.Do(postReq)
-	elapsedNanoSec := time.Since(start)
-	elapsedMS := int64(elapsedNanoSec / time.Millisecond)
-	results := NewPoolResult(pool, elapsedMS)
-	if err != nil {
-		status := http.StatusBadRequest
-		errMsg := err.Error()
-		if strings.Contains(err.Error(), "Timeout") {
-			status = http.StatusRequestTimeout
-			errMsg = fmt.Sprintf("%s search timed out", pool.PrivateURL)
-		} else if strings.Contains(err.Error(), "connection refused") {
-			status = http.StatusServiceUnavailable
-			errMsg = fmt.Sprintf("%s is offline", pool.PrivateURL)
-		}
-		results.StatusCode = status
-		results.StatusMessage = errMsg
-		channel <- results
-		return
-	}
-
-	defer postResp.Body.Close()
-	bodyBytes, _ := ioutil.ReadAll(postResp.Body)
-	if postResp.StatusCode != 200 {
+	postResp := servicePost(sURL, reqBytes, headers)
+	results := NewPoolResult(pool, postResp.ElapsedMS)
+	if postResp.StatusCode != http.StatusOK {
 		results.StatusCode = postResp.StatusCode
-		results.StatusMessage = string(bodyBytes)
+		results.StatusMessage = string(postResp.Response)
 		channel <- results
 		return
 	}
 
-	err = json.Unmarshal(bodyBytes, results)
+	err := json.Unmarshal(postResp.Response, results)
 	if err != nil {
 		results.StatusCode = http.StatusInternalServerError
 		results.StatusMessage = "Malformed search response"
@@ -276,13 +273,8 @@ func searchPool(pool *Pool, req SearchRequest, qp SearchQP, headers map[string]s
 
 	// If we are this far, there is a valid response. Add language
 	results.StatusCode = http.StatusOK
-	elapsedNanoSec = time.Since(start)
-	results.ElapsedMS = int64(elapsedNanoSec / time.Millisecond)
-	results.ContentLanguage = postResp.Header.Get("Content-Language")
-	if results.ContentLanguage == "" {
-		results.ContentLanguage = postReq.Header.Get("Accept-Language")
-	}
+	results.ElapsedMS = postResp.ElapsedMS
+	results.ContentLanguage = postResp.ContentLanguage
 
-	log.Printf("Successful pool response from %s. Elapsed Time: %d (ms)", sURL, elapsedMS)
 	channel <- results
 }
