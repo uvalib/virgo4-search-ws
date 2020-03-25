@@ -160,7 +160,7 @@ func servicePost(url string, body []byte, headers map[string]string) timedRespon
 	resp := timedResponse{ElapsedMS: elapsedMS}
 	if err != nil {
 		resp.Response = []byte(err.Error())
-		resp.StatusCode = postResp.StatusCode
+		resp.StatusCode = http.StatusInternalServerError
 		if strings.Contains(err.Error(), "Timeout") {
 			resp.StatusCode = http.StatusRequestTimeout
 			resp.Response = []byte(fmt.Sprintf("POST %s search timed out", url))
@@ -169,7 +169,7 @@ func servicePost(url string, body []byte, headers map[string]string) timedRespon
 			resp.Response = []byte(fmt.Sprintf("%s is offline", url))
 		}
 		log.Printf("ERROR: Failed response from POST %s - %d:%s. Elapsed Time: %d (ms)",
-			url, postResp.StatusCode, resp.Response, elapsedMS)
+			url, resp.StatusCode, resp.Response, elapsedMS)
 	} else {
 		defer postResp.Body.Close()
 		bodyBytes, _ := ioutil.ReadAll(postResp.Body)
