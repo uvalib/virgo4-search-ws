@@ -4,6 +4,7 @@ package main
 type SearchRequest struct {
 	Query       string            `json:"query"`
 	Pagination  Pagination        `json:"pagination"`
+	Sort        VirgoSort         `json:"sort"`
 	Filters     []VirgoFilter     `json:"filters"`
 	Preferences SearchPreferences `json:"preferences"`
 }
@@ -11,7 +12,6 @@ type SearchRequest struct {
 // SearchQP defines the query params that could be passed to the pools
 type SearchQP struct {
 	debug  string
-	intuit string
 }
 
 // VirgoFilter contains the fields for a single filter.
@@ -47,12 +47,26 @@ type Pagination struct {
 	Total int `json:"total"`
 }
 
+// VirgoSort specifies sort options for a given search.
+type VirgoSort struct {
+	SortID string `json:"sort_id"`
+	Order  string `json:"order"`
+}
+
+// VirgoSortOption defines an available sort option.
+type VirgoSortOption struct {
+	ID    string `json:"id"`
+	Label string `json:"label"`
+}
+
 // PoolResult is the response from a single pool
 type PoolResult struct {
 	ServiceURL      string                 `json:"service_url,omitempty"`
 	PoolName        string                 `json:"pool_id,omitempty"`
 	ElapsedMS       int64                  `json:"elapsed_ms,omitempty"`
 	Pagination      Pagination             `json:"pagination"`
+	Sort            VirgoSort              `json:"sort,omitempty"`
+	SortOptions     []VirgoSortOption      `json:"sort_options,omitempty"`
 	Records         []Record               `json:"record_list,omitempty"`
 	Groups          []Group                `json:"group_list,omitempty"`
 	FacetList       []VirgoFacet           `json:"facet_list,omitempty"` // facet values for client-requested facets

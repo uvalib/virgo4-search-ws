@@ -145,8 +145,8 @@ func (svc *ServiceContext) Search(c *gin.Context) {
 		out.Warnings = append(out.Warnings, msg)
 	}
 
-	// grab QP config for debug, search intuit, etc.
-	qp := SearchQP{debug: c.Query("debug"), intuit: c.Query("intuit")}
+	// grab QP config for debug, etc.
+	qp := SearchQP{debug: c.Query("debug")}
 
 	// headers to send to pool
 	headers := map[string]string{
@@ -240,7 +240,7 @@ func getSuggestions(url string, query string, headers map[string]string, channel
 // Goroutine to do a pool search and return the PoolResults on the channel
 func searchPool(pool *Pool, req SearchRequest, qp SearchQP, headers map[string]string, channel chan *PoolResult) {
 	// Master search always uses the Private URL to communicate with pools
-	sURL := fmt.Sprintf("%s/api/search?debug=%s&intuit=%s", pool.PrivateURL, qp.debug, qp.intuit)
+	sURL := fmt.Sprintf("%s/api/search?debug=%s", pool.PrivateURL, qp.debug)
 
 	// only send filter group applicable to this pool (if any)
 	poolReq := req
