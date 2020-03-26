@@ -14,6 +14,7 @@ type ServiceConfig struct {
 	DBUser       string
 	DBPass       string
 	Port         int
+	JWTKey       string
 }
 
 // LoadConfiguration will load the service configuration from env/cmdline
@@ -28,6 +29,7 @@ func LoadConfiguration() *ServiceConfig {
 	flag.StringVar(&cfg.DBUser, "dbuser", "v4user", "Database user")
 	flag.StringVar(&cfg.DBPass, "dbpass", "pass", "Database password")
 	flag.StringVar(&cfg.SuggestorURL, "suggestor", "", "Suggestor service URL")
+	flag.StringVar(&cfg.JWTKey, "jwtkey", "", "JWT signature key")
 
 	flag.Parse()
 
@@ -35,6 +37,9 @@ func LoadConfiguration() *ServiceConfig {
 		log.Fatal("suggestor param is required")
 	} else {
 		log.Printf("Suggestor API endpoint: %s", cfg.SuggestorURL)
+	}
+	if cfg.JWTKey == "" {
+		log.Fatal("jwtkey param is required")
 	}
 
 	return &cfg

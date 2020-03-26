@@ -15,6 +15,7 @@ import (
 	dbx "github.com/go-ozzo/ozzo-dbx"
 	_ "github.com/lib/pq"
 	"github.com/nicksnyder/go-i18n/v2/i18n"
+	"github.com/uvalib/virgo4-jwt/v4jwt"
 	"golang.org/x/text/language"
 )
 
@@ -23,6 +24,7 @@ type ServiceContext struct {
 	Version      string
 	DB           *dbx.DB
 	SuggestorURL string
+	JWTKey       string
 	I18NBundle   *i18n.Bundle
 }
 
@@ -31,7 +33,7 @@ type ServiceContext struct {
 // Any errors are FATAL.
 func InitializeService(version string, cfg *ServiceConfig) *ServiceContext {
 	log.Printf("Initializing Service")
-	svc := ServiceContext{Version: version, SuggestorURL: cfg.SuggestorURL}
+	svc := ServiceContext{Version: version, SuggestorURL: cfg.SuggestorURL, JWTKey: cfg.JWTKey}
 
 	log.Printf("Connect to Postgres")
 	connStr := fmt.Sprintf("user=%s password=%s dbname=%s host=%s port=%d sslmode=disable",
@@ -120,19 +122,33 @@ func getBearerToken(authorization string) (string, error) {
 }
 
 // AuthMiddleware is a middleware handler that verifies presence of a
-// user Bearer token in the Authorization header.
+// user JWT in the Authorization header, and verifies its validity
 func (svc *ServiceContext) AuthMiddleware(c *gin.Context) {
-	token, err := getBearerToken(c.Request.Header.Get("Authorization"))
-
+	tokenStr, err := getBearerToken(c.Request.Header.Get("Authorization"))
 	if err != nil {
 		log.Printf("Authentication failed: [%s]", err.Error())
 		c.AbortWithStatus(http.StatusUnauthorized)
 		return
 	}
 
-	// do something with token
+	if tokenStr == "undefined" {
+		log.Printf("Authentication failed; bearer token is undefined")
+		c.AbortWithStatus(http.StatusUnauthorized)
+		return
+	}
 
-	log.Printf("got bearer token: [%s]", token)
+	log.Printf("Validating JWT auth token...")
+	v4Claims, jwtErr := v4jwt.Validate(tokenStr, svc.JWTKey)
+	if jwtErr != nil {
+		log.Printf("JWT signature for %s is invalid: %s", tokenStr, jwtErr.Error())
+		c.AbortWithStatus(http.StatusUnauthorized)
+		return
+	}
+
+	// add the parsed claims and signed JWT string to the request context so other handlers can access it.
+	c.Set("jwt", tokenStr)
+	c.Set("claims", v4Claims)
+	log.Printf("got bearer token: [%s]: %+v", tokenStr, v4Claims)
 }
 
 type timedResponse struct {
