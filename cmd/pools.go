@@ -25,6 +25,13 @@ type Pool struct {
 	Description string          `json:"description"`
 	Mode        string          `json:"mode,omitempty"`
 	Attributes  []PoolAttribute `json:"attributes,omitempty"`
+	SortOptions []SortOption    `json:"sort_options,omitempty"`
+}
+
+// SortOption defines a sorting option for a pool
+type SortOption struct {
+	ID    string `json:"id"`
+	Label string `json:"label"`
 }
 
 // PoolAttribute defines a sungle attribute that a pool may support
@@ -42,6 +49,7 @@ func (p *Pool) Identify(language string) error {
 		Description string          `json:"description"`
 		Mode        string          `json:"mode,omitempty"`
 		Attributes  []PoolAttribute `json:"attributes,omitempty"`
+		SortOptions []SortOption    `json:"sort_options,omitempty"`
 	}
 	timeout := time.Duration(2 * time.Second)
 	client := http.Client{
@@ -77,6 +85,7 @@ func (p *Pool) Identify(language string) error {
 		p.Description = identity.Description
 		p.Mode = identity.Mode
 		p.Attributes = identity.Attributes
+		p.SortOptions = identity.SortOptions
 		poolsNS := time.Since(start)
 		log.Printf("%s identified in %s as %s. Time: %d ms", p.Name, p.Language, p.DisplayName, int64(poolsNS/time.Millisecond))
 		return nil
