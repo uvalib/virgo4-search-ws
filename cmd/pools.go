@@ -51,7 +51,7 @@ func PoolExists(url string, pools []*pool) bool {
 // LookupPools fetches a localizes list of current pools the V4DB & pool /identify
 // Any pools that fail the /identify call will not be included
 func (svc *ServiceContext) lookupPools(language string) ([]*pool, error) {
-	pools := make([]*pool, 0, 0)
+	pools := make([]*pool, 0)
 	q := svc.DB.NewQuery(`select * from sources`)
 	rows, err := q.Rows()
 	if err != nil {
@@ -82,7 +82,7 @@ func (svc *ServiceContext) lookupPools(language string) ([]*pool, error) {
 
 	if len(pools) == 0 {
 		log.Printf("ERROR: No pools found")
-		return nil, errors.New("No pools found")
+		return nil, errors.New("no pools found")
 	}
 
 	return pools, nil

@@ -21,13 +21,13 @@ func NewSearchResponse(req *v4api.SearchRequest) *v4api.SearchResponse {
 	return &v4api.SearchResponse{Request: req,
 		Pools:    make([]v4api.PoolIdentity, 0),
 		Results:  make([]*v4api.PoolResult, 0),
-		Warnings: make([]string, 0, 0),
+		Warnings: make([]string, 0),
 	}
 }
 
 // NewPoolResult creates a new result struct
 func NewPoolResult(pool *pool, ms int64) *v4api.PoolResult {
 	return &v4api.PoolResult{ServiceURL: pool.V4ID.URL, PoolName: pool.V4ID.ID,
-		ElapsedMS: ms, Warnings: make([]string, 0, 0),
+		ElapsedMS: ms, Warnings: make([]string, 0),
 	}
 }

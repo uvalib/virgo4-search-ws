@@ -115,7 +115,7 @@ func getBearerToken(authorization string) (string, error) {
 
 	// must have two components, the first of which is "Bearer", and the second a non-empty token
 	if len(components) != 2 || components[0] != "Bearer" || components[1] == "" {
-		return "", fmt.Errorf("Invalid Authorization header: [%s]", authorization)
+		return "", fmt.Errorf("invalid Authorization header: [%s]", authorization)
 	}
 
 	return components[1], nil
@@ -171,8 +171,8 @@ func servicePost(url string, body []byte, headers map[string]string) timedRespon
 	}
 	start := time.Now()
 	postResp, err := client.Do(postReq)
-	elapsedNanoSec := time.Since(start)
-	elapsedMS := int64(elapsedNanoSec / time.Millisecond)
+	elapsed := time.Since(start)
+	elapsedMS := int64(elapsed / time.Millisecond)
 	resp := timedResponse{ElapsedMS: elapsedMS}
 	if err != nil {
 		resp.Response = []byte(err.Error())

@@ -174,8 +174,8 @@ func (svc *ServiceContext) Search(c *gin.Context) {
 	sort.Sort(&poolSort)
 
 	// Total time for all respones (basically the longest response)
-	elapsedNanoSec := time.Since(start)
-	elapsedMS := int64(elapsedNanoSec / time.Millisecond)
+	elapsed := time.Since(start)
+	elapsedMS := int64(elapsed / time.Millisecond)
 	out.TotalTimeMS = elapsedMS
 
 	log.Printf("Received all pool responses. Elapsed Time: %d (ms)", elapsedMS)
