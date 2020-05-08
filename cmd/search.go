@@ -243,6 +243,10 @@ func searchPool(pool *pool, req v4api.SearchRequest, debug string, headers map[s
 		return
 	}
 
+	if results.Pagination == nil {
+		results.Pagination = &v4api.Pagination{Start: 0, Total: 0, Rows: 0}
+	}
+
 	// If we are this far, there is a valid response. Add language
 	results.StatusCode = http.StatusOK
 	results.ElapsedMS = postResp.ElapsedMS
