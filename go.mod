@@ -10,11 +10,11 @@ require (
 	github.com/gin-gonic/gin v1.6.3
 	github.com/go-ozzo/ozzo-dbx v1.5.0
 	github.com/golang/protobuf v1.4.1 // indirect
-	github.com/lib/pq v1.5.1
+	github.com/lib/pq v1.5.2
 	github.com/nicksnyder/go-i18n/v2 v2.0.3
 	github.com/prometheus/client_golang v1.6.0
 	github.com/sirupsen/logrus v1.6.0 // indirect
-	github.com/uvalib/virgo4-api v0.0.0-20200507052122-7a8b9ebf1685
+	github.com/uvalib/virgo4-api v0.0.0-20200508182614-47c3773a6cea
 	github.com/uvalib/virgo4-jwt v0.0.0-20200427141047-8e5c1f68bc8f
 	github.com/uvalib/virgo4-parser v0.0.0-20200210232429-840aa60f76a5
 	github.com/zsais/go-gin-prometheus v0.1.0
