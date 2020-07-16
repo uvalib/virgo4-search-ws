@@ -131,6 +131,12 @@ func identifyPool(dbp *dbPool, language string, channel chan *identifyResult) {
 			identity.V4ID.ID = dbp.Name
 			identity.PrivateURL = dbp.PrivateURL
 			identity.V4ID.URL = dbp.PublicURL
+			for _, attr := range identity.V4ID.Attributes {
+				if attr.Name == "external_hold" && attr.Supported == true {
+					identity.IsExternal = true
+					break
+				}
+			}
 			poolsNS := time.Since(start)
 			identified = true
 			log.Printf("%s identified in %s as %s. Time: %d ms", dbp.Name, tgtLanguage, identity.V4ID.Name, int64(poolsNS/time.Millisecond))

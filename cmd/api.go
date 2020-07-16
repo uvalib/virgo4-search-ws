@@ -11,9 +11,11 @@ type dbPool struct {
 }
 
 // pool is an extension of the API pool which includes private URL
+// and an easy access flag to indicate if the pool is external (like JRML & WorldCat)
 type pool struct {
 	V4ID       v4api.PoolIdentity
 	PrivateURL string `json:"-"`
+	IsExternal bool   `json:"-"`
 }
 
 // NewSearchResponse creates a new instance of a search response

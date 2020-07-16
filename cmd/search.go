@@ -189,7 +189,7 @@ func getSuggestions(url string, query string, headers map[string]string, channel
 	}
 	reqStruct.Query = query
 	reqBytes, _ := json.Marshal(reqStruct)
-	resp := servicePost(url, reqBytes, headers)
+	resp := servicePost(url, reqBytes, headers, time.Duration(10*time.Second))
 	if resp.StatusCode != http.StatusOK {
 		channel <- make([]v4api.Suggestion, 0)
 		return
@@ -226,7 +226,12 @@ func searchPool(pool *pool, req v4api.SearchRequest, debug string, headers map[s
 	}
 
 	reqBytes, _ := json.Marshal(poolReq)
-	postResp := servicePost(sURL, reqBytes, headers)
+	timeoutSec := time.Duration(10 * time.Second)
+	if pool.IsExternal {
+		log.Printf("Pool %s is managed externally, reduce timeout to 5 seconds", pool.V4ID.Name)
+		timeoutSec = time.Duration(5 * time.Second)
+	}
+	postResp := servicePost(sURL, reqBytes, headers, timeoutSec)
 	results := NewPoolResult(pool, postResp.ElapsedMS)
 	if postResp.StatusCode != http.StatusOK {
 		results.StatusCode = postResp.StatusCode

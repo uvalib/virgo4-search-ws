@@ -158,14 +158,13 @@ type timedResponse struct {
 	ElapsedMS       int64
 }
 
-func servicePost(url string, body []byte, headers map[string]string) timedResponse {
-	log.Printf("POST %s: %s", url, body)
+func servicePost(url string, body []byte, headers map[string]string, timeout time.Duration) timedResponse {
+	log.Printf("POST %s: %s timeout %.0f", url, body, timeout.Seconds())
 	postReq, _ := http.NewRequest("POST", url, bytes.NewBuffer(body))
 	for name, val := range headers {
 		postReq.Header.Set(name, val)
 	}
 
-	timeout := time.Duration(10 * time.Second)
 	client := http.Client{
 		Timeout: timeout,
 	}
