@@ -127,7 +127,7 @@ func (svc *ServiceContext) Search(c *gin.Context) {
 
 	sugChannel := make(chan []v4api.Suggestion)
 	sugURL := fmt.Sprintf("%s/api/suggest", svc.SuggestorURL)
-	go getSuggestions(sugURL, req.Query, headers, sugChannel)
+	go svc.getSuggestions(sugURL, req.Query, headers, sugChannel)
 
 	// Kick off all pool requests in parallel and wait for all to respond
 	channel := make(chan *v4api.PoolResult)
@@ -142,7 +142,7 @@ func (svc *ServiceContext) Search(c *gin.Context) {
 			continue
 		}
 		outstandingRequests++
-		go searchPool(p, req, c.Query("debug"), headers, channel)
+		go svc.searchPool(p, req, c.Query("debug"), headers, channel)
 	}
 
 	// wait for all to be done and get respnses as they come in
@@ -183,13 +183,13 @@ func (svc *ServiceContext) Search(c *gin.Context) {
 	c.JSON(http.StatusOK, out)
 }
 
-func getSuggestions(url string, query string, headers map[string]string, channel chan []v4api.Suggestion) {
+func (svc *ServiceContext) getSuggestions(url string, query string, headers map[string]string, channel chan []v4api.Suggestion) {
 	var reqStruct struct {
 		Query string
 	}
 	reqStruct.Query = query
 	reqBytes, _ := json.Marshal(reqStruct)
-	resp := servicePost(url, reqBytes, headers, time.Duration(10*time.Second))
+	resp := servicePost(url, reqBytes, headers, svc.HTTPClient)
 	if resp.StatusCode != http.StatusOK {
 		channel <- make([]v4api.Suggestion, 0)
 		return
@@ -210,7 +210,7 @@ func getSuggestions(url string, query string, headers map[string]string, channel
 }
 
 // Goroutine to do a pool search and return the PoolResults on the channel
-func searchPool(pool *pool, req v4api.SearchRequest, debug string, headers map[string]string, channel chan *v4api.PoolResult) {
+func (svc *ServiceContext) searchPool(pool *pool, req v4api.SearchRequest, debug string, headers map[string]string, channel chan *v4api.PoolResult) {
 	// Master search always uses the Private URL to communicate with pools
 	sURL := fmt.Sprintf("%s/api/search?debug=%s", pool.PrivateURL, debug)
 
@@ -226,12 +226,12 @@ func searchPool(pool *pool, req v4api.SearchRequest, debug string, headers map[s
 	}
 
 	reqBytes, _ := json.Marshal(poolReq)
-	timeoutSec := time.Duration(10 * time.Second)
+	httpClient := svc.HTTPClient
 	if pool.IsExternal {
 		log.Printf("Pool %s is managed externally, reduce timeout to 5 seconds", pool.V4ID.Name)
-		timeoutSec = time.Duration(5 * time.Second)
+		httpClient = svc.FastHTTPClient
 	}
-	postResp := servicePost(sURL, reqBytes, headers, timeoutSec)
+	postResp := servicePost(sURL, reqBytes, headers, httpClient)
 	results := NewPoolResult(pool, postResp.ElapsedMS)
 	if postResp.StatusCode != http.StatusOK {
 		results.StatusCode = postResp.StatusCode

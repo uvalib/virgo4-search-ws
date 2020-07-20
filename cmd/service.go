@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"log"
+	"net"
 	"net/http"
 	"path/filepath"
 	"strings"
@@ -21,11 +22,13 @@ import (
 
 // ServiceContext contains common data used by all handlers
 type ServiceContext struct {
-	Version      string
-	DB           *dbx.DB
-	SuggestorURL string
-	JWTKey       string
-	I18NBundle   *i18n.Bundle
+	Version        string
+	DB             *dbx.DB
+	SuggestorURL   string
+	JWTKey         string
+	I18NBundle     *i18n.Bundle
+	HTTPClient     *http.Client
+	FastHTTPClient *http.Client
 }
 
 // InitializeService will initialize the service context based on the config parameters.
@@ -50,6 +53,25 @@ func InitializeService(version string, cfg *ServiceConfig) *ServiceContext {
 	svc.I18NBundle.RegisterUnmarshalFunc("toml", toml.Unmarshal)
 	svc.I18NBundle.MustLoadMessageFile("./i18n/active.en.toml")
 	svc.I18NBundle.MustLoadMessageFile("./i18n/active.es.toml")
+
+	log.Printf("Create HTTP client for external service calls")
+	defaultTransport := &http.Transport{
+		Dial: (&net.Dialer{
+			Timeout:   2 * time.Second,
+			KeepAlive: 600 * time.Second,
+		}).Dial,
+		TLSHandshakeTimeout: 2 * time.Second,
+		MaxIdleConns:        100,
+		MaxIdleConnsPerHost: 100,
+	}
+	svc.HTTPClient = &http.Client{
+		Transport: defaultTransport,
+		Timeout:   10 * time.Second,
+	}
+	svc.FastHTTPClient = &http.Client{
+		Transport: defaultTransport,
+		Timeout:   5 * time.Second,
+	}
 
 	return &svc
 }
@@ -92,17 +114,14 @@ func (svc *ServiceContext) HealthCheck(c *gin.Context) {
 	}
 
 	if svc.SuggestorURL != "" {
-		timeout := time.Duration(5 * time.Second)
-		client := http.Client{
-			Timeout: timeout,
-		}
 		apiURL := fmt.Sprintf("%s/version", svc.SuggestorURL)
-		_, err := client.Get(apiURL)
+		resp, err := svc.FastHTTPClient.Get(apiURL)
 		if err != nil {
 			log.Printf("ERROR: Suggestor %s ping failed: %s", svc.SuggestorURL, err.Error())
 			hcMap["suggestor"] = hcResp{Healthy: false, Message: err.Error()}
 		} else {
 			hcMap["suggestor"] = hcResp{Healthy: true}
+			defer resp.Body.Close()
 		}
 	}
 
@@ -158,18 +177,15 @@ type timedResponse struct {
 	ElapsedMS       int64
 }
 
-func servicePost(url string, body []byte, headers map[string]string, timeout time.Duration) timedResponse {
-	log.Printf("POST %s: %s timeout %.0f", url, body, timeout.Seconds())
+func servicePost(url string, body []byte, headers map[string]string, httpClient *http.Client) timedResponse {
+	log.Printf("POST %s: %s timeout %.0f", url, body, httpClient.Timeout.Seconds())
 	postReq, _ := http.NewRequest("POST", url, bytes.NewBuffer(body))
 	for name, val := range headers {
 		postReq.Header.Set(name, val)
 	}
 
-	client := http.Client{
-		Timeout: timeout,
-	}
 	start := time.Now()
-	postResp, err := client.Do(postReq)
+	postResp, err := httpClient.Do(postReq)
 	elapsed := time.Since(start)
 	elapsedMS := int64(elapsed / time.Millisecond)
 	resp := timedResponse{ElapsedMS: elapsedMS}

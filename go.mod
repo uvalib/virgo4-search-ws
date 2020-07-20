@@ -10,7 +10,7 @@ require (
 	github.com/gin-gonic/gin v1.6.3
 	github.com/go-ozzo/ozzo-dbx v1.5.0
 	github.com/go-playground/validator/v10 v10.3.0 // indirect
-	github.com/lib/pq v1.7.0
+	github.com/lib/pq v1.7.1
 	github.com/nicksnyder/go-i18n/v2 v2.0.3
 	github.com/prometheus/client_golang v1.7.1
 	github.com/sirupsen/logrus v1.6.0 // indirect
