@@ -66,7 +66,7 @@ func (svc *ServiceContext) lookupPools(language string) ([]*pool, error) {
 		p := dbPool{}
 		rows.ScanStruct(&p)
 		outstandingRequests++
-		go identifyPool(&p, language, channel)
+		go identifyPool(&p, language, channel, svc.FastHTTPClient)
 	}
 
 	for outstandingRequests > 0 {
@@ -94,11 +94,7 @@ type identifyResult struct {
 }
 
 // Goroutine to do a pool identify and return the results over a channel
-func identifyPool(dbp *dbPool, language string, channel chan *identifyResult) {
-	timeout := time.Duration(2 * time.Second)
-	client := http.Client{
-		Timeout: timeout,
-	}
+func identifyPool(dbp *dbPool, language string, channel chan *identifyResult, httpClient *http.Client) {
 	URL := fmt.Sprintf("%s/identify", dbp.PrivateURL)
 	languages := []string{language}
 	if language != "en-US" {
@@ -115,7 +111,7 @@ func identifyPool(dbp *dbPool, language string, channel chan *identifyResult) {
 			continue
 		}
 		idRequest.Header.Set("Accept-Language", tgtLanguage)
-		resp, err := client.Do(idRequest)
+		resp, err := httpClient.Do(idRequest)
 		if err != nil {
 			log.Printf("ERROR: %s /identify failed: %s", dbp.PrivateURL, err.Error())
 			continue

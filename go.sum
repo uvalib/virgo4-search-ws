@@ -168,8 +168,8 @@ github.com/ugorji/go/codec v1.1.7 h1:2SvQaVZ1ouYrrKKwoSk2pzd4A9evlKJb9oTL+OaLUSs
 github.com/ugorji/go/codec v1.1.7/go.mod h1:Ax+UKWsSmolVDwsd+7N3ZtXu+yMGCf907BLYF3GoBXY=
 github.com/uvalib/virgo4-api v0.0.0-20200624183033-cc354b7de983 h1:q/9ZLuLFKru3+5cgKr9gHjWmew4c0oGt8JYhmIJxMc4=
 github.com/uvalib/virgo4-api v0.0.0-20200624183033-cc354b7de983/go.mod h1:p+LmQBQahBom6DErthL8iGZU6NgRJ9aN2wM7EE6VBSE=
-github.com/uvalib/virgo4-jwt v0.0.0-20200713145335-aaee08e3d30a h1:gs1iGI+g2sEngv1N7eVudEpBpt6y0DxNw3ewQoFvkKQ=
-github.com/uvalib/virgo4-jwt v0.0.0-20200713145335-aaee08e3d30a/go.mod h1:pPSHBTeq1RftpQGB6H1GaihwPZtl5RpGCEeov0eH05Y=
+github.com/uvalib/virgo4-jwt v0.0.0-20200721191235-9967844ca5e1 h1:MVO27tVVD/emTNcvtW9AibjujzeyoGz2aff2T2snpLY=
+github.com/uvalib/virgo4-jwt v0.0.0-20200721191235-9967844ca5e1/go.mod h1:pPSHBTeq1RftpQGB6H1GaihwPZtl5RpGCEeov0eH05Y=
 github.com/uvalib/virgo4-parser v0.0.0-20200603201936-661eb9b3b7bf h1:XAUtGWwEg0oidRZ3clkafAZdlC1JqViJeKQOLgCcijk=
 github.com/uvalib/virgo4-parser v0.0.0-20200603201936-661eb9b3b7bf/go.mod h1:oD6YA1ao3Eo5QVI5q6AoZKgWH/2NBWTa4e9dzQ9okw8=
 github.com/zsais/go-gin-prometheus v0.1.0 h1:bkLv1XCdzqVgQ36ScgRi09MA2UC1t3tAB6nsfErsGO4=
@@ -211,8 +211,8 @@ golang.org/x/sys v0.0.0-20190813064441-fde4db37ae7a/go.mod h1:h1NjWce9XRLGQEsW7w
 golang.org/x/sys v0.0.0-20200106162015-b016eb3dc98e/go.mod h1:h1NjWce9XRLGQEsW7wpKNCjG9DtNlClVuFLEZdDNbEs=
 golang.org/x/sys v0.0.0-20200116001909-b77594299b42/go.mod h1:h1NjWce9XRLGQEsW7wpKNCjG9DtNlClVuFLEZdDNbEs=
 golang.org/x/sys v0.0.0-20200615200032-f1bc736245b1/go.mod h1:h1NjWce9XRLGQEsW7wpKNCjG9DtNlClVuFLEZdDNbEs=
-golang.org/x/sys v0.0.0-20200625212154-ddb9806d33ae h1:Ih9Yo4hSPImZOpfGuA4bR/ORKTAbhZo2AbWNRCnevdo=
-golang.org/x/sys v0.0.0-20200625212154-ddb9806d33ae/go.mod h1:h1NjWce9XRLGQEsW7wpKNCjG9DtNlClVuFLEZdDNbEs=
+golang.org/x/sys v0.0.0-20200722175500-76b94024e4b6 h1:X9xIZ1YU8bLZA3l6gqDUHSFiD0GFI9S548h6C8nDtOY=
+golang.org/x/sys v0.0.0-20200722175500-76b94024e4b6/go.mod h1:h1NjWce9XRLGQEsW7wpKNCjG9DtNlClVuFLEZdDNbEs=
 golang.org/x/text v0.3.0 h1:g61tztE5qeGQ89tm6NTjjM9VPIm088od1l6aSorWRWg=
 golang.org/x/text v0.3.0/go.mod h1:NqM8EUOU14njkJ3fqMW+pc6Ldnwhi/IjpwHt7yyuwOQ=
 golang.org/x/text v0.3.2 h1:tW2bmiBqwgJj/UpqtC8EpXEZVYOwU0yG4iWbprSVAcs=
