@@ -92,14 +92,6 @@ func (svc *ServiceContext) Search(c *gin.Context) {
 		return
 	}
 
-	// see if target pool is also in exclude list
-	if req.Preferences.TargetPool != "" && req.Preferences.IsExcluded(req.Preferences.TargetPool) {
-		log.Printf("ERROR: Target Pool %s is also excluded", req.Preferences.TargetPool)
-		msg := localizer.MustLocalize(&i18n.LocalizeConfig{MessageID: "TargetExcluded"})
-		c.String(http.StatusBadRequest, msg)
-		return
-	}
-
 	// Just before each search, lookup the pools to search
 	out := NewSearchResponse(&req)
 	start := time.Now()
@@ -135,10 +127,8 @@ func (svc *ServiceContext) Search(c *gin.Context) {
 	for _, p := range pools {
 		out.Pools = append(out.Pools, p.V4ID)
 
-		// NOTE: the client only knows about publicURL so all excludes
-		// will be done with it as the key
-		if req.Preferences.IsExcluded(p.V4ID.URL) {
-			log.Printf("Skipping %s as it is part of the excluded URL list", p.V4ID.URL)
+		if isPoolExcluded(&req.Preferences, p) {
+			log.Printf("Skipping %s as it is part of the excluded pools list", p.V4ID.URL)
 			continue
 		}
 		outstandingRequests++
@@ -254,4 +244,13 @@ func (svc *ServiceContext) searchPool(pool *pool, req v4api.SearchRequest, debug
 	results.ContentLanguage = postResp.ContentLanguage
 
 	channel <- results
+}
+
+func isPoolExcluded(searchPrefs *v4api.SearchPreferences, pool *pool) bool {
+	for _, identifier := range searchPrefs.ExcludePools {
+		if identifier == pool.V4ID.URL || identifier == pool.V4ID.ID {
+			return true
+		}
+	}
+	return false
 }

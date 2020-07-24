@@ -38,10 +38,10 @@ func (svc *ServiceContext) GetPoolsRequest(c *gin.Context) {
 	c.JSON(http.StatusOK, out)
 }
 
-// PoolExists checks if a pool with the given URL exists, regardless of the current status.
-func PoolExists(url string, pools []*pool) bool {
+// PoolExists checks if a pool with the given identifier (URL or Name)
+func PoolExists(identifier string, pools []*pool) bool {
 	for _, p := range pools {
-		if p.V4ID.URL == url {
+		if p.V4ID.URL == identifier || p.V4ID.Name == identifier {
 			return true
 		}
 	}
