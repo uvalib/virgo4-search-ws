@@ -16,7 +16,7 @@ require (
 	github.com/prometheus/common v0.11.1 // indirect
 	github.com/uvalib/virgo4-api v0.0.0-20200724140137-c7c9f5537601
 	github.com/uvalib/virgo4-jwt v0.0.0-20200722181137-be853a3737d4
-	github.com/uvalib/virgo4-parser v0.0.0-20200603201936-661eb9b3b7bf
+	github.com/uvalib/virgo4-parser v0.0.0-20200804201336-f19184e8140c
 	github.com/zsais/go-gin-prometheus v0.1.0
 	golang.org/x/sys v0.0.0-20200803210538-64077c9b5642 // indirect
 	golang.org/x/text v0.3.3

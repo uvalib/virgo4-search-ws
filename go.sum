@@ -338,8 +338,8 @@ github.com/uvalib/virgo4-api v0.0.0-20200724140137-c7c9f5537601 h1:RYFDYGO96uMoi
 github.com/uvalib/virgo4-api v0.0.0-20200724140137-c7c9f5537601/go.mod h1:p+LmQBQahBom6DErthL8iGZU6NgRJ9aN2wM7EE6VBSE=
 github.com/uvalib/virgo4-jwt v0.0.0-20200722181137-be853a3737d4 h1:dQaiMX990PUFrgyF2BmK+10JY0k+IE2OZDoJX3li0tE=
 github.com/uvalib/virgo4-jwt v0.0.0-20200722181137-be853a3737d4/go.mod h1:pPSHBTeq1RftpQGB6H1GaihwPZtl5RpGCEeov0eH05Y=
-github.com/uvalib/virgo4-parser v0.0.0-20200603201936-661eb9b3b7bf h1:XAUtGWwEg0oidRZ3clkafAZdlC1JqViJeKQOLgCcijk=
-github.com/uvalib/virgo4-parser v0.0.0-20200603201936-661eb9b3b7bf/go.mod h1:oD6YA1ao3Eo5QVI5q6AoZKgWH/2NBWTa4e9dzQ9okw8=
+github.com/uvalib/virgo4-parser v0.0.0-20200804201336-f19184e8140c h1:e0vr3mUXHmqOHbaPwNFnuimGa/P94a57E7hQH0ZPy50=
+github.com/uvalib/virgo4-parser v0.0.0-20200804201336-f19184e8140c/go.mod h1:oD6YA1ao3Eo5QVI5q6AoZKgWH/2NBWTa4e9dzQ9okw8=
 github.com/xiang90/probing v0.0.0-20190116061207-43a291ad63a2/go.mod h1:UETIi67q53MR2AWcXfiuqkDkRtnGDLqkBTpCHuJHxtU=
 github.com/zsais/go-gin-prometheus v0.1.0 h1:bkLv1XCdzqVgQ36ScgRi09MA2UC1t3tAB6nsfErsGO4=
 github.com/zsais/go-gin-prometheus v0.1.0/go.mod h1:Slirjzuz8uM8Cw0jmPNqbneoqcUtY2GGjn2bEd4NRLY=
