@@ -132,7 +132,7 @@ func (svc *ServiceContext) Search(c *gin.Context) {
 			continue
 		}
 		outstandingRequests++
-		go svc.searchPool(p, req, c.Query("debug"), headers, channel)
+		go svc.searchPool(p, req, headers, channel)
 	}
 
 	// wait for all to be done and get respnses as they come in
@@ -200,9 +200,9 @@ func (svc *ServiceContext) getSuggestions(url string, query string, headers map[
 }
 
 // Goroutine to do a pool search and return the PoolResults on the channel
-func (svc *ServiceContext) searchPool(pool *pool, req v4api.SearchRequest, debug string, headers map[string]string, channel chan *v4api.PoolResult) {
+func (svc *ServiceContext) searchPool(pool *pool, req v4api.SearchRequest, headers map[string]string, channel chan *v4api.PoolResult) {
 	// Master search always uses the Private URL to communicate with pools
-	sURL := fmt.Sprintf("%s/api/search?debug=%s", pool.PrivateURL, debug)
+	sURL := fmt.Sprintf("%s/api/search", pool.PrivateURL)
 
 	// only send filter group applicable to this pool (if any)
 	poolReq := req
