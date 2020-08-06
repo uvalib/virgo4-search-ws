@@ -336,6 +336,8 @@ github.com/urfave/cli v1.20.0/go.mod h1:70zkFmudgCuE/ngEzBv17Jvp/497gISqfk5gWijb
 github.com/urfave/cli v1.22.1/go.mod h1:Gos4lmkARVdJ6EkW0WaNv/tZAAMe9V7XWyB60NtXRu0=
 github.com/uvalib/virgo4-api v0.0.0-20200805193433-2c1c62e7c813 h1:RepYpj/MN4RXbkOfBrk3WCTlm9kM0bfSqNtiWxB4z8c=
 github.com/uvalib/virgo4-api v0.0.0-20200805193433-2c1c62e7c813/go.mod h1:p+LmQBQahBom6DErthL8iGZU6NgRJ9aN2wM7EE6VBSE=
+github.com/uvalib/virgo4-api v0.0.0-20200806190757-b16031e3f2de h1:Gf/iFJUows9Km0/7xUNySEldzF2zLv2ocnuReqtHfxo=
+github.com/uvalib/virgo4-api v0.0.0-20200806190757-b16031e3f2de/go.mod h1:p+LmQBQahBom6DErthL8iGZU6NgRJ9aN2wM7EE6VBSE=
 github.com/uvalib/virgo4-jwt v0.0.0-20200722181137-be853a3737d4 h1:dQaiMX990PUFrgyF2BmK+10JY0k+IE2OZDoJX3li0tE=
 github.com/uvalib/virgo4-jwt v0.0.0-20200722181137-be853a3737d4/go.mod h1:pPSHBTeq1RftpQGB6H1GaihwPZtl5RpGCEeov0eH05Y=
 github.com/uvalib/virgo4-parser v0.0.0-20200804201336-f19184e8140c h1:e0vr3mUXHmqOHbaPwNFnuimGa/P94a57E7hQH0ZPy50=
@@ -425,6 +427,8 @@ golang.org/x/sys v0.0.0-20200615200032-f1bc736245b1/go.mod h1:h1NjWce9XRLGQEsW7w
 golang.org/x/sys v0.0.0-20200625212154-ddb9806d33ae/go.mod h1:h1NjWce9XRLGQEsW7wpKNCjG9DtNlClVuFLEZdDNbEs=
 golang.org/x/sys v0.0.0-20200805065543-0cf7623e9dbd h1:wefLe/3g5tC0FcXw3NneLA5tHgbyouyZlfcSjNfOdgk=
 golang.org/x/sys v0.0.0-20200805065543-0cf7623e9dbd/go.mod h1:h1NjWce9XRLGQEsW7wpKNCjG9DtNlClVuFLEZdDNbEs=
+golang.org/x/sys v0.0.0-20200806125547-5acd03effb82 h1:6cBnXxYO+CiRVrChvCosSv7magqTPbyAgz1M8iOv5wM=
+golang.org/x/sys v0.0.0-20200806125547-5acd03effb82/go.mod h1:h1NjWce9XRLGQEsW7wpKNCjG9DtNlClVuFLEZdDNbEs=
 golang.org/x/text v0.3.0 h1:g61tztE5qeGQ89tm6NTjjM9VPIm088od1l6aSorWRWg=
 golang.org/x/text v0.3.0/go.mod h1:NqM8EUOU14njkJ3fqMW+pc6Ldnwhi/IjpwHt7yyuwOQ=
 golang.org/x/text v0.3.2 h1:tW2bmiBqwgJj/UpqtC8EpXEZVYOwU0yG4iWbprSVAcs=
