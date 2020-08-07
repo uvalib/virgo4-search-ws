@@ -6,6 +6,7 @@ import (
 
 	"github.com/gin-contrib/cors"
 	"github.com/gin-contrib/gzip"
+	"github.com/gin-contrib/pprof"
 	"github.com/gin-gonic/gin"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
@@ -53,6 +54,10 @@ func main() {
 	{
 		api.GET("/pools", svc.GetPoolsRequest)
 		api.POST("/search", svc.AuthMiddleware, svc.Search)
+	}
+
+	if admin := router.Group("/admin", svc.AuthMiddleware, svc.AdminMiddleware); admin != nil {
+		pprof.RouteRegister(admin, "pprof")
 	}
 
 	portStr := fmt.Sprintf(":%d", cfg.Port)

@@ -170,6 +170,26 @@ func (svc *ServiceContext) AuthMiddleware(c *gin.Context) {
 	log.Printf("got bearer token: [%s]: %+v", tokenStr, v4Claims)
 }
 
+// AdminMiddleware is a middleware handler that verifies that an
+// already-authorized user is an admin
+func (svc *ServiceContext) AdminMiddleware(c *gin.Context) {
+	val, ok := c.Get("claims")
+
+	if ok == false {
+		log.Printf("no claims")
+		c.AbortWithStatus(http.StatusUnauthorized)
+		return
+	}
+
+	claims := val.(*v4jwt.V4Claims)
+
+	if claims.Role.String() != "admin" {
+		log.Printf("insufficient permissions")
+		c.AbortWithStatus(http.StatusUnauthorized)
+		return
+	}
+}
+
 type timedResponse struct {
 	StatusCode      int
 	ContentLanguage string

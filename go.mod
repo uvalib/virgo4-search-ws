@@ -7,6 +7,7 @@ require (
 	github.com/antlr/antlr4 v0.0.0-20200801005519-2ba38605b949 // indirect
 	github.com/gin-contrib/cors v1.3.1
 	github.com/gin-contrib/gzip v0.0.2
+	github.com/gin-contrib/pprof v1.3.0
 	github.com/gin-gonic/gin v1.6.3
 	github.com/go-ozzo/ozzo-dbx v1.5.0
 	github.com/go-playground/validator/v10 v10.3.0 // indirect
