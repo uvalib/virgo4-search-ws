@@ -41,7 +41,7 @@ func (svc *ServiceContext) GetPoolsRequest(c *gin.Context) {
 // PoolExists checks if a pool with the given identifier (URL or Name)
 func PoolExists(identifier string, pools []*pool) bool {
 	for _, p := range pools {
-		if p.V4ID.URL == identifier || p.V4ID.Name == identifier {
+		if p.V4ID.URL == identifier || p.V4ID.ID == identifier {
 			return true
 		}
 	}

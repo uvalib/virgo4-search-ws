@@ -75,7 +75,7 @@ func (svc *ServiceContext) Search(c *gin.Context) {
 	}
 	localizer := i18n.NewLocalizer(svc.I18NBundle, acceptLang)
 
-	var req v4api.SearchRequest
+	var req clientSearchRequest
 	if err := c.BindJSON(&req); err != nil {
 		log.Printf("ERROR: unable to parse search request: %s", err.Error())
 		msg := localizer.MustLocalize(&i18n.LocalizeConfig{MessageID: "BadSearch"})
@@ -132,7 +132,7 @@ func (svc *ServiceContext) Search(c *gin.Context) {
 			continue
 		}
 		outstandingRequests++
-		go svc.searchPool(p, req, headers, channel)
+		go svc.searchPool(p, &req, headers, channel)
 	}
 
 	// wait for all to be done and get respnses as they come in
@@ -200,17 +200,24 @@ func (svc *ServiceContext) getSuggestions(url string, query string, headers map[
 }
 
 // Goroutine to do a pool search and return the PoolResults on the channel
-func (svc *ServiceContext) searchPool(pool *pool, req v4api.SearchRequest, headers map[string]string, channel chan *v4api.PoolResult) {
+func (svc *ServiceContext) searchPool(pool *pool, req *clientSearchRequest, headers map[string]string, channel chan *v4api.PoolResult) {
 	// Master search always uses the Private URL to communicate with pools
 	sURL := fmt.Sprintf("%s/api/search", pool.PrivateURL)
 
 	// only send filter group applicable to this pool (if any)
 	poolReq := req
 	poolReq.Filters = []v4api.Filter{}
+	poolReq.Sort = v4api.SortOrder{SortID: "SortRelevance", Order: "desc"}
 
 	for _, filterGroup := range req.Filters {
 		if filterGroup.PoolID == pool.V4ID.ID {
 			poolReq.Filters = append(poolReq.Filters, filterGroup)
+			break
+		}
+	}
+	for _, poolSort := range req.PoolSort {
+		if poolSort.PoolID == pool.V4ID.ID {
+			poolReq.Sort = poolSort.Sort
 			break
 		}
 	}
