@@ -84,7 +84,7 @@ func (svc *ServiceContext) Search(c *gin.Context) {
 	}
 	log.Printf("Search Request %+v with Accept-Language %s", req, acceptLang)
 
-	valid, errors := v4parser.Validate(req.Query)
+	valid, errors := v4parser.ValidateWithTimeout(req.Query, 10)
 	if valid == false {
 		log.Printf("ERROR: Query [%s] is not valid: %s", req.Query, errors)
 		msg := localizer.MustLocalize(&i18n.LocalizeConfig{MessageID: "BadSearch"})
