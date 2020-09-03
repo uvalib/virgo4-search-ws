@@ -56,3 +56,8 @@ func NewPoolResult(pool *pool, ms int64) *v4api.PoolResult {
 		ElapsedMS: ms, Warnings: make([]string, 0),
 	}
 }
+
+type searchError struct {
+	Message string `json:"message"`
+	Details string `json:"details"`
+}
