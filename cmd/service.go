@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"encoding/json"
 	"fmt"
 	"io/ioutil"
 	"log"
@@ -26,6 +27,7 @@ type ServiceContext struct {
 	DB             *dbx.DB
 	SuggestorURL   string
 	JWTKey         string
+	Solr           SolrConfig
 	I18NBundle     *i18n.Bundle
 	HTTPClient     *http.Client
 	FastHTTPClient *http.Client
@@ -36,7 +38,10 @@ type ServiceContext struct {
 // Any errors are FATAL.
 func InitializeService(version string, cfg *ServiceConfig) *ServiceContext {
 	log.Printf("Initializing Service")
-	svc := ServiceContext{Version: version, SuggestorURL: cfg.SuggestorURL, JWTKey: cfg.JWTKey}
+	svc := ServiceContext{Version: version,
+		SuggestorURL: cfg.SuggestorURL,
+		Solr:         cfg.Solr,
+		JWTKey:       cfg.JWTKey}
 
 	log.Printf("Connect to Postgres")
 	connStr := fmt.Sprintf("user=%s password=%s dbname=%s host=%s port=%d sslmode=disable",
@@ -197,6 +202,39 @@ type timedResponse struct {
 	ElapsedMS       int64
 }
 
+func (svc *ServiceContext) solrPost(query string, jsonReq interface{}) ([]byte, *RequestError) {
+	url := fmt.Sprintf("%s/%s/%s", svc.Solr.URL, svc.Solr.Core, query)
+
+	jsonBytes, jsonErr := json.Marshal(jsonReq)
+	if jsonErr != nil {
+		resp, err := handleAPIResponse(url, nil, jsonErr)
+		return resp, err
+	}
+
+	req, reqErr := http.NewRequest("POST", url, bytes.NewBuffer(jsonBytes))
+	if reqErr != nil {
+		resp, err := handleAPIResponse(url, nil, reqErr)
+		return resp, err
+	}
+
+	req.Header.Set("Content-Type", "application/json")
+
+	log.Printf("Solr POST request: %s", url)
+	startTime := time.Now()
+	rawResp, rawErr := svc.FastHTTPClient.Do(req)
+	resp, err := handleAPIResponse(url, rawResp, rawErr)
+	elapsedNanoSec := time.Since(startTime)
+	elapsedMS := int64(elapsedNanoSec / time.Millisecond)
+
+	if err != nil {
+		log.Printf("ERROR: Failed response from Solr POST %s - %d:%s. Elapsed Time: %d (ms)",
+			url, err.StatusCode, err.Message, elapsedMS)
+	} else {
+		log.Printf("Successful response from Solr POST %s. Elapsed Time: %d (ms)", url, elapsedMS)
+	}
+	return resp, err
+}
+
 func servicePost(url string, body []byte, headers map[string]string, httpClient *http.Client) timedResponse {
 	log.Printf("POST %s: %s timeout %.0f", url, body, httpClient.Timeout.Seconds())
 	postReq, _ := http.NewRequest("POST", url, bytes.NewBuffer(body))
@@ -205,41 +243,52 @@ func servicePost(url string, body []byte, headers map[string]string, httpClient 
 	}
 
 	start := time.Now()
-	postResp, err := httpClient.Do(postReq)
+	postResp, postErr := httpClient.Do(postReq)
+	respBytes, err := handleAPIResponse(url, postResp, postErr)
 	elapsed := time.Since(start)
 	elapsedMS := int64(elapsed / time.Millisecond)
 	resp := timedResponse{ElapsedMS: elapsedMS}
 	if err != nil {
-		resp.Response = []byte(err.Error())
-		resp.StatusCode = http.StatusInternalServerError
-		if strings.Contains(err.Error(), "Timeout") {
-			resp.StatusCode = http.StatusRequestTimeout
-			resp.Response = []byte(fmt.Sprintf("POST %s search timed out", url))
-		} else if strings.Contains(err.Error(), "connection refused") {
-			resp.StatusCode = http.StatusServiceUnavailable
-			resp.Response = []byte(fmt.Sprintf("%s is offline", url))
-		}
 		log.Printf("ERROR: Failed response from POST %s - %d:%s. Elapsed Time: %d (ms)",
-			url, resp.StatusCode, resp.Response, elapsedMS)
+			url, err.StatusCode, err.Message, elapsedMS)
+		resp.StatusCode = err.StatusCode
+		resp.Response = []byte(err.Message)
 	} else {
-		defer postResp.Body.Close()
-		bodyBytes, _ := ioutil.ReadAll(postResp.Body)
+		log.Printf("Successful response from POST %s. Elapsed Time: %d (ms)", url, elapsedMS)
 		resp.StatusCode = postResp.StatusCode
-		resp.Response = bodyBytes
-		if resp.StatusCode != http.StatusOK {
-			log.Printf("ERROR: Failed response from POST %s - %d:%s. Elapsed Time: %d (ms)",
-				url, postResp.StatusCode, resp.Response, elapsedMS)
-		} else {
-			log.Printf("Successful response from POST %s. Elapsed Time: %d (ms)", url, elapsedMS)
-			resp.ContentLanguage = postResp.Header.Get("Content-Language")
-			if resp.ContentLanguage == "" {
-				resp.ContentLanguage = postReq.Header.Get("Accept-Language")
-			}
-			if resp.ContentLanguage == "" {
-				resp.ContentLanguage = "en-US"
-			}
-		}
+		resp.Response = respBytes
 	}
 
 	return resp
+}
+
+// RequestError contains http status code and message for a failed service request
+type RequestError struct {
+	StatusCode int
+	Message    string
+}
+
+func handleAPIResponse(logURL string, resp *http.Response, err error) ([]byte, *RequestError) {
+	if err != nil {
+		status := http.StatusBadRequest
+		errMsg := err.Error()
+		if strings.Contains(err.Error(), "Timeout") {
+			status = http.StatusRequestTimeout
+			errMsg = fmt.Sprintf("%s timed out", logURL)
+		} else if strings.Contains(err.Error(), "connection refused") {
+			status = http.StatusServiceUnavailable
+			errMsg = fmt.Sprintf("%s refused connection", logURL)
+		}
+		return nil, &RequestError{StatusCode: status, Message: errMsg}
+	} else if resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusCreated {
+		defer resp.Body.Close()
+		bodyBytes, _ := ioutil.ReadAll(resp.Body)
+		status := resp.StatusCode
+		errMsg := string(bodyBytes)
+		return nil, &RequestError{StatusCode: status, Message: errMsg}
+	}
+
+	defer resp.Body.Close()
+	bodyBytes, _ := ioutil.ReadAll(resp.Body)
+	return bodyBytes, nil
 }

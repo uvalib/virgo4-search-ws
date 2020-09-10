@@ -5,6 +5,12 @@ import (
 	"log"
 )
 
+// SolrConfig wraps up the config for solr acess
+type SolrConfig struct {
+	URL  string
+	Core string
+}
+
 // ServiceConfig defines all of the archives transfer service configuration paramaters
 type ServiceConfig struct {
 	SuggestorURL string
@@ -15,6 +21,7 @@ type ServiceConfig struct {
 	DBPass       string
 	Port         int
 	JWTKey       string
+	Solr         SolrConfig
 }
 
 // LoadConfiguration will load the service configuration from env/cmdline
@@ -31,6 +38,10 @@ func LoadConfiguration() *ServiceConfig {
 	flag.StringVar(&cfg.SuggestorURL, "suggestor", "", "Suggestor service URL")
 	flag.StringVar(&cfg.JWTKey, "jwtkey", "", "JWT signature key")
 
+	// Solr config
+	flag.StringVar(&cfg.Solr.URL, "solr", "", "Solr URL for journal browse")
+	flag.StringVar(&cfg.Solr.Core, "core", "test_core", "Solr core for journal browse")
+
 	flag.Parse()
 
 	if cfg.SuggestorURL == "" {
@@ -40,6 +51,11 @@ func LoadConfiguration() *ServiceConfig {
 	}
 	if cfg.JWTKey == "" {
 		log.Fatal("jwtkey param is required")
+	}
+	if cfg.Solr.URL == "" || cfg.Solr.Core == "" {
+		log.Fatal("solr and core params are required")
+	} else {
+		log.Printf("Solr endpoint: %s/%s", cfg.Solr.URL, cfg.Solr.Core)
 	}
 
 	return &cfg

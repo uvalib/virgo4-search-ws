@@ -11,6 +11,7 @@ require (
 	github.com/go-ozzo/ozzo-dbx v1.5.0
 	github.com/go-playground/validator/v10 v10.3.0 // indirect
 	github.com/lib/pq v1.8.0
+	github.com/mitchellh/mapstructure v1.3.3
 	github.com/nicksnyder/go-i18n/v2 v2.0.3
 	github.com/prometheus/client_golang v1.7.1
 	github.com/prometheus/common v0.13.0 // indirect
@@ -18,7 +19,7 @@ require (
 	github.com/uvalib/virgo4-jwt v0.0.0-20200812155832-7443daa580fd
 	github.com/uvalib/virgo4-parser v0.0.0-20200826214539-8b5cbe0c25ff
 	github.com/zsais/go-gin-prometheus v0.1.0
-	golang.org/x/sys v0.0.0-20200831180312-196b9ba8737a // indirect
+	golang.org/x/sys v0.0.0-20200909081042-eff7692f9009 // indirect
 	golang.org/x/text v0.3.3
 	google.golang.org/protobuf v1.25.0 // indirect
 )

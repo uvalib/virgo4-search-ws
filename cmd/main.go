@@ -54,6 +54,7 @@ func main() {
 	{
 		api.GET("/pools", svc.GetPoolsRequest)
 		api.POST("/search", svc.AuthMiddleware, svc.Search)
+		api.GET("/filters", svc.AuthMiddleware, svc.GetSearchFilters)
 	}
 
 	if admin := router.Group("/admin", svc.AuthMiddleware, svc.AdminMiddleware); admin != nil {
