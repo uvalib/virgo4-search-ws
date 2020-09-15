@@ -344,8 +344,8 @@ github.com/ugorji/go/codec v1.1.8 h1:4dryPvxMP9OtkjIbuNeK2nb27M38XMHLGlfNSNph/5s
 github.com/ugorji/go/codec v1.1.8/go.mod h1:X00B19HDtwvKbQY2DcYjvZxKQp8mzrJoQ6EgoIY/D2E=
 github.com/urfave/cli v1.20.0/go.mod h1:70zkFmudgCuE/ngEzBv17Jvp/497gISqfk5gWijbERA=
 github.com/urfave/cli v1.22.1/go.mod h1:Gos4lmkARVdJ6EkW0WaNv/tZAAMe9V7XWyB60NtXRu0=
-github.com/uvalib/virgo4-api v0.0.0-20200915003205-5749653d25fc h1:5QzDyB29xnieRZH8HnyV91Ph8tMzeVqmto9gwKTjoWc=
-github.com/uvalib/virgo4-api v0.0.0-20200915003205-5749653d25fc/go.mod h1:p+LmQBQahBom6DErthL8iGZU6NgRJ9aN2wM7EE6VBSE=
+github.com/uvalib/virgo4-api v0.0.0-20200915062629-3b3ed56175b2 h1:xks/nCRkxttRj+ykU6KmPho9jOY2Qsorn8IaH8Ox6u8=
+github.com/uvalib/virgo4-api v0.0.0-20200915062629-3b3ed56175b2/go.mod h1:p+LmQBQahBom6DErthL8iGZU6NgRJ9aN2wM7EE6VBSE=
 github.com/uvalib/virgo4-jwt v0.0.0-20200812155832-7443daa580fd h1:ox1gpbYRXB0fFS+JiMa560a6wn4Y5+MrJc4G0ASCk7E=
 github.com/uvalib/virgo4-jwt v0.0.0-20200812155832-7443daa580fd/go.mod h1:pPSHBTeq1RftpQGB6H1GaihwPZtl5RpGCEeov0eH05Y=
 github.com/uvalib/virgo4-parser v0.0.0-20200826214539-8b5cbe0c25ff h1:QbfbYpQJlVvdNN8t87TqmIsBaDhSDffSKjHolWmSans=
