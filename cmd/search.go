@@ -78,8 +78,9 @@ func (svc *ServiceContext) Search(c *gin.Context) {
 	var req clientSearchRequest
 	if err := c.BindJSON(&req); err != nil {
 		log.Printf("ERROR: unable to parse search request: %s", err.Error())
-		msg := localizer.MustLocalize(&i18n.LocalizeConfig{MessageID: "BadSearch"})
-		c.String(http.StatusBadRequest, msg)
+		err := searchError{Message: localizer.MustLocalize(&i18n.LocalizeConfig{MessageID: "BadSearch"}),
+			Details: err.Error()}
+		c.JSON(http.StatusBadRequest, err)
 		return
 	}
 	log.Printf("Search Request %+v with Accept-Language %s", req, acceptLang)
@@ -87,8 +88,9 @@ func (svc *ServiceContext) Search(c *gin.Context) {
 	valid, errors := v4parser.ValidateWithTimeout(req.Query, 10)
 	if valid == false {
 		log.Printf("ERROR: Query [%s] is not valid: %s", req.Query, errors)
-		msg := localizer.MustLocalize(&i18n.LocalizeConfig{MessageID: "BadSearch"})
-		c.String(http.StatusBadRequest, msg)
+		err := searchError{Message: localizer.MustLocalize(&i18n.LocalizeConfig{MessageID: "BadSearch"}),
+			Details: errors}
+		c.JSON(http.StatusBadRequest, err)
 		return
 	}
 
@@ -98,8 +100,9 @@ func (svc *ServiceContext) Search(c *gin.Context) {
 	pools, err := svc.lookupPools(acceptLang)
 	if err != nil {
 		log.Printf("ERROR: unable to get search pools: %+v", err)
-		msg := localizer.MustLocalize(&i18n.LocalizeConfig{MessageID: "NoPools"})
-		c.String(http.StatusInternalServerError, msg)
+		err := searchError{Message: localizer.MustLocalize(&i18n.LocalizeConfig{MessageID: "NoPools"}),
+			Details: errors}
+		c.JSON(http.StatusInternalServerError, err)
 		return
 	}
 	log.Printf("Search %d pools", len(pools))

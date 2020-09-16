@@ -1,4 +1,3 @@
-BadSearch="Invalid search request"
-TargetExcluded="Target source cannot be excluded"
-NoPools="No sources available"
-TargetPoolUnavailable="Target source is not available"
+BadSearch="This query is malformed or unsupported."
+NoPools="All resourcess are surrently offline. Please try again later."
+TargetPoolUnavailable="The resource you requested to search is currently offline. Please try again later."
