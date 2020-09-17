@@ -249,8 +249,15 @@ func servicePost(url string, body []byte, headers map[string]string, httpClient 
 	elapsedMS := int64(elapsed / time.Millisecond)
 	resp := timedResponse{ElapsedMS: elapsedMS}
 	if err != nil {
-		log.Printf("ERROR: Failed response from POST %s - %d:%s. Elapsed Time: %d (ms)",
-			url, err.StatusCode, err.Message, elapsedMS)
+		logLevel := "ERROR"
+		// we want to log "not implemented" differently as they are "expected" in some cases
+		// (some pools do not support some query types, etc)
+		// this ensures the log filters pick up real errors
+		if err.StatusCode == http.StatusNotImplemented {
+			logLevel = "WARNING"
+		}
+		log.Printf("%s: Failed response from POST %s - %d:%s. Elapsed Time: %d (ms)",
+			logLevel, url, err.StatusCode, err.Message, elapsedMS)
 		resp.StatusCode = err.StatusCode
 		resp.Response = []byte(err.Message)
 	} else {
