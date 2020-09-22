@@ -75,7 +75,7 @@ func (svc *ServiceContext) GetSearchFilters(c *gin.Context) {
 	}
 
 	if err := json.Unmarshal(respBytes, &solrResp); err != nil {
-		log.Printf("ERROR: unable to parse Solr response: %s", err.Error())
+		log.Printf("ERROR: Unable to parse Solr response: %s", err.Error())
 		c.String(http.StatusInternalServerError, err.Error())
 		return
 	}

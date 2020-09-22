@@ -77,7 +77,7 @@ func (svc *ServiceContext) Search(c *gin.Context) {
 
 	var req clientSearchRequest
 	if err := c.BindJSON(&req); err != nil {
-		log.Printf("ERROR: unable to parse search request: %s", err.Error())
+		log.Printf("ERROR: Unable to parse search request: %s", err.Error())
 		err := searchError{Message: localizer.MustLocalize(&i18n.LocalizeConfig{MessageID: "BadSearch"}),
 			Details: err.Error()}
 		c.JSON(http.StatusBadRequest, err)
@@ -99,7 +99,7 @@ func (svc *ServiceContext) Search(c *gin.Context) {
 	start := time.Now()
 	pools, err := svc.lookupPools(acceptLang)
 	if err != nil {
-		log.Printf("ERROR: unable to get search pools: %+v", err)
+		log.Printf("ERROR: Unable to get search pools: %+v", err)
 		err := searchError{Message: localizer.MustLocalize(&i18n.LocalizeConfig{MessageID: "NoPools"}),
 			Details: errors}
 		c.JSON(http.StatusInternalServerError, err)
@@ -152,7 +152,14 @@ func (svc *ServiceContext) Search(c *gin.Context) {
 		if poolResponse.StatusCode == http.StatusOK {
 			out.TotalHits += poolResponse.Pagination.Total
 		} else {
-			log.Printf("ERROR: %s returned %d:%s", poolResponse.ServiceURL,
+			logLevel := "ERROR"
+			// we want to log "not implemented" differently as they are "expected" in some cases
+			// (some pools do not support some query types, etc)
+			// this ensures the log filters pick up real errors
+			if poolResponse.StatusCode == http.StatusNotImplemented {
+				logLevel = "WARNING"
+			}
+			log.Printf("%s: %s returned %d:%s", logLevel, poolResponse.ServiceURL,
 				poolResponse.StatusCode, poolResponse.StatusMessage)
 			out.Warnings = append(out.Warnings, poolResponse.StatusMessage)
 		}
@@ -194,7 +201,7 @@ func (svc *ServiceContext) getSuggestions(url string, query string, headers map[
 	}
 	err := json.Unmarshal(resp.Response, &respStruct)
 	if err != nil {
-		log.Printf("ERROR: malformed suggestor response: %s", err.Error())
+		log.Printf("ERROR: Malformed suggestor response: %s", err.Error())
 		channel <- make([]v4api.Suggestion, 0)
 		return
 	}
