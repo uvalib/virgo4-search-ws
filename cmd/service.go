@@ -235,9 +235,16 @@ func (svc *ServiceContext) solrPost(query string, jsonReq interface{}) ([]byte, 
 	return resp, err
 }
 
-func servicePost(url string, body []byte, headers map[string]string, httpClient *http.Client) timedResponse {
-	log.Printf("POST %s: %s timeout %.0f", url, body, httpClient.Timeout.Seconds())
-	postReq, _ := http.NewRequest("POST", url, bytes.NewBuffer(body))
+func serviceRequest(verb string, url string, body []byte, headers map[string]string, httpClient *http.Client) timedResponse {
+	log.Printf("%s %s: %s timeout %.0f", verb, url, body, httpClient.Timeout.Seconds())
+	var postReq *http.Request
+	if verb == "POST" {
+		log.Printf("request has a body")
+		postReq, _ = http.NewRequest(verb, url, bytes.NewBuffer(body))
+	} else {
+		postReq, _ = http.NewRequest(verb, url, nil)
+	}
+
 	for name, val := range headers {
 		postReq.Header.Set(name, val)
 	}

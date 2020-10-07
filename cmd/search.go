@@ -189,7 +189,7 @@ func (svc *ServiceContext) getSuggestions(url string, query string, headers map[
 	}
 	reqStruct.Query = query
 	reqBytes, _ := json.Marshal(reqStruct)
-	resp := servicePost(url, reqBytes, headers, svc.HTTPClient)
+	resp := serviceRequest("POST", url, reqBytes, headers, svc.HTTPClient)
 	if resp.StatusCode != http.StatusOK {
 		channel <- make([]v4api.Suggestion, 0)
 		return
@@ -238,7 +238,7 @@ func (svc *ServiceContext) searchPool(pool *pool, req clientSearchRequest, heade
 		log.Printf("Pool %s is managed externally, reduce timeout to 5 seconds", pool.V4ID.Name)
 		httpClient = svc.FastHTTPClient
 	}
-	postResp := servicePost(sURL, reqBytes, headers, httpClient)
+	postResp := serviceRequest("POST", sURL, reqBytes, headers, httpClient)
 	results := NewPoolResult(pool, postResp.ElapsedMS)
 	if postResp.StatusCode != http.StatusOK {
 		results.StatusCode = postResp.StatusCode
