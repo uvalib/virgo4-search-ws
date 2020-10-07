@@ -7,17 +7,19 @@ GOVET = $(GOCMD) vet
 GOGET = $(GOCMD) get
 GOMOD = $(GOCMD) mod
 
-build: darwin 
+build: darwin
 
 all: darwin linux
 
 darwin:
 	GOOS=darwin GOARCH=amd64 $(GOBUILD) -a -o bin/v4search.darwin cmd/*.go
 	cp -r i18n/ bin/i18n
+	cp -r ttf/ bin/ttf
 
 linux:
 	CGO_ENABLED=0 GOOS=linux GOARCH=amd64 $(GOBUILD) -a -installsuffix cgo -o bin/v4search.linux cmd/*.go
 	cp -r i18n/ bin/i18n
+	cp -r ttf/ bin/ttf
 
 clean:
 	$(GOCLEAN) cmd/

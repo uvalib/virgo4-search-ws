@@ -5,9 +5,11 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/gin-gonic/gin"
+	"github.com/signintech/gopdf"
 )
 
 type requestItem struct {
@@ -54,6 +56,22 @@ func (svc *ServiceContext) GeneratePDF(c *gin.Context) {
 		"Authorization":   c.GetHeader("Authorization"),
 	}
 
+	pdf := gopdf.GoPdf{}
+	pdf.Start(gopdf.Config{PageSize: *gopdf.PageSizeA4}) // W: 595, H: 842
+	pdf.AddPage()
+	err := pdf.AddTTFFont("osr", "./ttf/OpenSans-Regular.ttf")
+	if err != nil {
+		log.Printf("ERROR: Unable to load PDF font %s", err.Error())
+		c.String(http.StatusInternalServerError, "Unable to generate PDF")
+		return
+	}
+	err = pdf.AddTTFFont("osb", "./ttf/OpenSans-Bold.ttf")
+	if err != nil {
+		log.Printf("ERROR: Unable to load PDF bold font %s", err.Error())
+		c.String(http.StatusInternalServerError, "Unable to generate PDF")
+		return
+	}
+
 	start := time.Now()
 	pools, err := svc.lookupPools(acceptLang)
 	if err != nil {
@@ -89,9 +107,48 @@ func (svc *ServiceContext) GeneratePDF(c *gin.Context) {
 	elapsedMS := int64(elapsed / time.Millisecond)
 	log.Printf("SUCCESS: All item details for printout receieved in %dms", elapsedMS)
 
-	log.Printf("%+v", out)
+	// render the PDF...
+	startY := 0
+	if req.Title != "" {
+		pdf.SetFont("osb", "", 12)
+		pdf.Cell(nil, req.Title)
+		pdf.Br(18)
+		startY += 18
+	}
+	if req.Notes != "" {
+		pdf.SetFont("osr", "", 10)
+		pdf.SetX(20)
+		pdf.Cell(nil, req.Notes)
+		pdf.Br(18)
+		startY += 18
+	}
+	if startY > 0 {
+		pdf.Line(10, float64(startY+10), 585, float64(startY+10))
+		pdf.Br(15)
+		startY += 15
+	}
+	for _, item := range out {
+		pdf.SetFont("osb", "", 10)
+		pdf.Cell(nil, strings.Join(item.Title, "; "))
+		pdf.Br(18)
+		pdf.SetFont("osr", "", 10)
+		pdf.SetX(20)
+		pdf.Cell(nil, strings.Join(item.Author, "; "))
+		pdf.Br(18)
+		pdf.SetX(20)
+		pdf.Cell(nil, strings.Join(item.Library, "; "))
+		pdf.Br(18)
+		pdf.SetX(20)
+		pdf.Cell(nil, strings.Join(item.Location, "; "))
+		pdf.Br(18)
+		pdf.SetX(20)
+		pdf.Cell(nil, strings.Join(item.CallNumber, ", "))
+		pdf.Br(25)
+	}
 
-	c.String(http.StatusNotImplemented, "not yet")
+	c.Header("Content-Description", "File Transfer")
+	c.Header("Content-Disposition", "attachment; filename=results.pdf")
+	pdf.Write(c.Writer)
 }
 
 func getPool(pools []*pool, identifier string) *pool {
