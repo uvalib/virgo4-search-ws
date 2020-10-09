@@ -107,48 +107,65 @@ func (svc *ServiceContext) GeneratePDF(c *gin.Context) {
 	elapsedMS := int64(elapsed / time.Millisecond)
 	log.Printf("SUCCESS: All item details for printout receieved in %dms", elapsedMS)
 
-	// render the PDF...
-	startY := 0
+	// render the PDF..
+	yPos := 20
 	if req.Title != "" {
-		pdf.SetFont("osb", "", 12)
-		pdf.Cell(nil, req.Title)
-		pdf.Br(18)
-		startY += 18
+		yPos = renderLine(&pdf, 20, yPos, req.Title, "osb", 12)
 	}
 	if req.Notes != "" {
-		pdf.SetFont("osr", "", 10)
-		pdf.SetX(20)
-		pdf.Cell(nil, req.Notes)
-		pdf.Br(18)
-		startY += 18
+		yPos += 5
+		yPos = renderLine(&pdf, 20, yPos, req.Notes, "osr", 10)
 	}
-	if startY > 0 {
-		pdf.Line(10, float64(startY+10), 585, float64(startY+10))
-		pdf.Br(15)
-		startY += 15
-	}
-	for _, item := range out {
-		pdf.SetFont("osb", "", 10)
-		pdf.Cell(nil, strings.Join(item.Title, "; "))
-		pdf.Br(18)
-		pdf.SetFont("osr", "", 10)
-		pdf.SetX(20)
-		pdf.Cell(nil, strings.Join(item.Author, "; "))
-		pdf.Br(18)
-		pdf.SetX(20)
-		pdf.Cell(nil, strings.Join(item.Library, "; "))
-		pdf.Br(18)
-		pdf.SetX(20)
-		pdf.Cell(nil, strings.Join(item.Location, "; "))
-		pdf.Br(18)
-		pdf.SetX(20)
-		pdf.Cell(nil, strings.Join(item.CallNumber, ", "))
-		pdf.Br(25)
+	if yPos > 20 {
+		yPos += 8
+		pdf.Line(10, float64(yPos), 585, float64(yPos))
+		yPos += 15
 	}
 
-	c.Header("Content-Description", "File Transfer")
+	for _, item := range out {
+		pdf.SetFont("osb", "", 10)
+		yPos = renderLine(&pdf, 20, yPos, strings.Join(item.Title, "; "), "osb", 10)
+		yPos = renderLine(&pdf, 30, yPos, strings.Join(item.Author, "; "), "osr", 10)
+		// yPos = renderLine(&pdf, 30, yPos, strings.Join(item.Library, "; "), "osr", 10)
+		yPos = renderLine(&pdf, 30, yPos, strings.Join(item.Location, "; "), "osr", 10)
+		yPos = renderLine(&pdf, 30, yPos, strings.Join(item.CallNumber, "; "), "osr", 10)
+		yPos += 10
+	}
+
 	c.Header("Content-Disposition", "attachment; filename=results.pdf")
+	c.Header("Content-Type", "application/pdf")
 	pdf.Write(c.Writer)
+}
+
+// render a line of the PDF with line breaks. return the new Y position
+func renderLine(pdf *gopdf.GoPdf, xPos int, yPos int, line string, fontName string, fontSize int) int {
+	pdf.SetFont(fontName, "", fontSize)
+	words := strings.Fields(line)
+	line = ""
+	for _, word := range words {
+		testLine := line
+		if testLine != "" {
+			testLine += " "
+		}
+		testLine += word
+		lineW, _ := pdf.MeasureTextWidth(testLine)
+		if lineW >= 550 {
+			pdf.SetY(float64(yPos))
+			pdf.SetX(float64(xPos))
+			pdf.Cell(nil, line)
+			yPos += (fontSize + 6)
+			line = word
+		} else {
+			line = testLine
+		}
+	}
+	if line != "" {
+		pdf.SetY(float64(yPos))
+		pdf.SetX(float64(xPos))
+		pdf.Cell(nil, line)
+		yPos += (fontSize + 4)
+	}
+	return yPos
 }
 
 func getPool(pools []*pool, identifier string) *pool {
@@ -198,7 +215,9 @@ func (svc *ServiceContext) getDetails(item requestItem, pool *pool, headers map[
 			respItem.Library = append(respItem.Library, field.Value)
 		}
 		if field.Name == "location" {
-			respItem.Location = append(respItem.Location, field.Value)
+			if field.Value != "By Request" {
+				respItem.Location = append(respItem.Location, field.Value)
+			}
 		}
 		if field.Name == "call_number" {
 			respItem.CallNumber = append(respItem.CallNumber, field.Value)
