@@ -52,7 +52,7 @@ func PoolExists(identifier string, pools []*pool) bool {
 // Any pools that fail the /identify call will not be included
 func (svc *ServiceContext) lookupPools(language string) ([]*pool, error) {
 	pools := make([]*pool, 0)
-	q := svc.DB.NewQuery(`select * from sources`)
+	q := svc.DB.NewQuery(`select * from sources where enabled=true`)
 	rows, err := q.Rows()
 	if err != nil {
 		log.Printf("ERROR: Unable to get authoritative pool information: %+v", err)
