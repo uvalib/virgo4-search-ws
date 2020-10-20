@@ -52,9 +52,9 @@ func main() {
 	router.GET("/healthcheck", svc.HealthCheck)
 	api := router.Group("/api")
 	{
-		api.POST("/pdf", svc.AuthMiddleware, svc.GeneratePDF)
-		api.GET("/pools", svc.GetPoolsRequest)
-		api.POST("/search", svc.AuthMiddleware, svc.Search)
+		api.POST("/pdf", svc.AuthMiddleware, svc.PoolsMiddleware, svc.GeneratePDF)
+		api.GET("/pools", svc.PoolsMiddleware, svc.GetPoolsRequest)
+		api.POST("/search", svc.AuthMiddleware, svc.PoolsMiddleware, svc.Search)
 		api.GET("/filters", svc.AuthMiddleware, svc.GetSearchFilters)
 	}
 

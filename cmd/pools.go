@@ -7,29 +7,56 @@ import (
 	"io/ioutil"
 	"log"
 	"net/http"
-	"strings"
 	"time"
 
+	dbx "github.com/go-ozzo/ozzo-dbx"
 	"github.com/uvalib/virgo4-api/v4api"
 
 	"github.com/gin-gonic/gin"
 )
 
-// GetPoolsRequest gets a list of all active pools and returns it as JSON. This includes
-// descriptive information localized to match the Accept-Language header. Fallback is en-US
-func (svc *ServiceContext) GetPoolsRequest(c *gin.Context) {
-	// Pick the first option in Accept-Language header - or en-US if none
-	acceptLang := strings.Split(c.GetHeader("Accept-Language"), ",")[0]
-	log.Printf("GetPools Accept-Language %s", acceptLang)
+// PoolsMiddleware sits after auth but before any other request. It checks for a sources param.
+// If found it looks up all pools in that source set. If not found, the default pool set is looked up.
+// Results placed in the request context for use by later handlers
+func (svc *ServiceContext) PoolsMiddleware(c *gin.Context) {
+	srcSet := c.Query("sources")
+	if srcSet == "" {
+		srcSet = "default"
+	}
+
+	acceptLang := c.GetHeader("Accept-Language")
 	if acceptLang == "" {
 		acceptLang = "en-US"
 	}
 
-	pools, err := svc.lookupPools(acceptLang)
+	log.Printf("Pools Middleware: get %s pools", srcSet)
+	start := time.Now()
+	pools, err := svc.lookupPools(acceptLang, srcSet)
 	if err != nil {
-		log.Printf("ERROR: GetPools failed %+v", err)
-		c.String(http.StatusInternalServerError, err.Error())
+		log.Printf("ERROR: Unable to get %s pools: %+v", srcSet, err)
+		c.AbortWithStatus(http.StatusNotFound)
+		return
 	}
+	elapsed := time.Since(start)
+	elapsedMS := int64(elapsed / time.Millisecond)
+	log.Printf("SUCCESS: %d %s pools found in %dms", len(pools), srcSet, elapsedMS)
+	c.Set("pools", pools)
+}
+
+func getPoolsFromContext(c *gin.Context) []*pool {
+	poolsIface, found := c.Get("pools")
+	if !found {
+		out := make([]*pool, 0)
+		log.Printf("ERROR: No pools found")
+		return out
+	}
+	return poolsIface.([]*pool)
+}
+
+// GetPoolsRequest gets a list of all active pools and returns it as JSON. This includes
+// descriptive information localized to match the Accept-Language header. Fallback is en-US
+func (svc *ServiceContext) GetPoolsRequest(c *gin.Context) {
+	pools := getPoolsFromContext(c)
 	out := make([]v4api.PoolIdentity, 0)
 	for _, p := range pools {
 		out = append(out, p.V4ID)
@@ -50,16 +77,16 @@ func PoolExists(identifier string, pools []*pool) bool {
 
 // LookupPools fetches a localizes list of current pools the V4DB & pool /identify
 // Any pools that fail the /identify call will not be included
-func (svc *ServiceContext) lookupPools(language string) ([]*pool, error) {
+func (svc *ServiceContext) lookupPools(language string, srcSet string) ([]*pool, error) {
 	pools := make([]*pool, 0)
-	q := svc.DB.NewQuery(`select * from sources where enabled=true`)
+	q := svc.DB.NewQuery(` select s.* from sources s inner join source_sets t on t.source_id=s.id where t.name={:set} and s.enabled=true`)
+	q.Bind(dbx.Params{"set": srcSet})
 	rows, err := q.Rows()
 	if err != nil {
 		log.Printf("ERROR: Unable to get authoritative pool information: %+v", err)
 		return nil, err
 	}
 
-	start := time.Now()
 	channel := make(chan *identifyResult)
 	outstandingRequests := 0
 	for rows.Next() {
@@ -76,9 +103,6 @@ func (svc *ServiceContext) lookupPools(language string) ([]*pool, error) {
 		}
 		outstandingRequests--
 	}
-
-	poolsNS := time.Since(start)
-	log.Printf("Time to identify %d pools %dMS", len(pools), int64(poolsNS/time.Millisecond))
 
 	if len(pools) == 0 {
 		log.Printf("ERROR: No pools found")

@@ -45,6 +45,14 @@ func (svc *ServiceContext) GeneratePDF(c *gin.Context) {
 		return
 	}
 
+	// Pools have already been placed in request context by poolsMiddleware. Get them or fail
+	pools := getPoolsFromContext(c)
+	if len(pools) == 0 {
+		log.Printf("ERROR: No pools found for PDF lookup")
+		c.String(http.StatusNotFound, "Unable to find item details")
+		return
+	}
+
 	acceptLang := c.GetHeader("Accept-Language")
 	if acceptLang == "" {
 		acceptLang = "en-US"
@@ -72,15 +80,8 @@ func (svc *ServiceContext) GeneratePDF(c *gin.Context) {
 		return
 	}
 
-	start := time.Now()
-	pools, err := svc.lookupPools(acceptLang)
-	if err != nil {
-		log.Printf("ERROR: Unable to get pools for PDF lookup: %+v", err)
-		c.String(http.StatusInternalServerError, "Unable to find item details")
-		return
-	}
-
 	// Kick off all pool requests in parallel and wait for all to respond
+	start := time.Now()
 	channel := make(chan *itemDetail)
 	outstandingRequests := 0
 	for _, item := range req.Items {

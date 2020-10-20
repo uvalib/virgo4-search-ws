@@ -94,19 +94,18 @@ func (svc *ServiceContext) Search(c *gin.Context) {
 		return
 	}
 
-	// Just before each search, lookup the pools to search
-	out := NewSearchResponse(&req)
-	start := time.Now()
-	pools, err := svc.lookupPools(acceptLang)
-	if err != nil {
-		log.Printf("ERROR: Unable to get search pools: %+v", err)
+	// Pools have already been placed in request context by poolsMiddleware. Get them or fail
+	pools := getPoolsFromContext(c)
+	if len(pools) == 0 {
 		err := searchError{Message: localizer.MustLocalize(&i18n.LocalizeConfig{MessageID: "NoPools"}),
 			Details: errors}
 		c.JSON(http.StatusInternalServerError, err)
 		return
 	}
-	log.Printf("Search %d pools", len(pools))
 
+	// Do the search...
+	out := NewSearchResponse(&req)
+	start := time.Now()
 	if req.Preferences.TargetPool != "" && PoolExists(req.Preferences.TargetPool, pools) == false {
 		log.Printf("WARNING: Target Pool %s is not registered", req.Preferences.TargetPool)
 		msg := localizer.MustLocalize(&i18n.LocalizeConfig{MessageID: "TargetPoolUnavailable"})
