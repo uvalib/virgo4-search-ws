@@ -79,7 +79,7 @@ func PoolExists(identifier string, pools []*pool) bool {
 // Any pools that fail the /identify call will not be included
 func (svc *ServiceContext) lookupPools(language string, srcSet string) ([]*pool, error) {
 	pools := make([]*pool, 0)
-	q := svc.DB.NewQuery(` select s.* from sources s inner join source_sets t on t.source_id=s.id where t.name={:set} and s.enabled=true`)
+	q := svc.DB.NewQuery(` select s.*, t.sequence from sources s inner join source_sets t on t.source_id=s.id where t.name={:set} and s.enabled=true order by sequence asc`)
 	q.Bind(dbx.Params{"set": srcSet})
 	rows, err := q.Rows()
 	if err != nil {
@@ -125,7 +125,7 @@ func identifyPool(dbp *dbPool, language string, channel chan *identifyResult, ht
 		languages = append(languages, "en-US")
 	}
 	start := time.Now()
-	identity := pool{PrivateURL: dbp.PrivateURL}
+	identity := pool{PrivateURL: dbp.PrivateURL, Sequence: dbp.Sequence}
 	identified := false
 	for _, tgtLanguage := range languages {
 		log.Printf("Request identity information from: %s in %s", URL, tgtLanguage)

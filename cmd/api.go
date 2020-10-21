@@ -8,6 +8,7 @@ type dbPool struct {
 	PrivateURL string `json:"-" db:"private_url"`
 	PublicURL  string `json:"-" db:"public_url"`
 	Name       string `json:"-" db:"name"`
+	Sequence   int    `json:"-" db:"sequence"`
 }
 
 // pool is an extension of the API pool which includes private URL
@@ -16,6 +17,7 @@ type pool struct {
 	V4ID       v4api.PoolIdentity
 	PrivateURL string `json:"-"`
 	IsExternal bool   `json:"-"`
+	Sequence   int    `json:"-"`
 }
 
 type poolSort struct {
