@@ -1,6 +1,8 @@
 package main
 
-import "github.com/uvalib/virgo4-api/v4api"
+import (
+	"github.com/uvalib/virgo4-api/v4api"
+)
 
 // bySequence will sort responses by pool set sequence number
 type bySequence struct {
@@ -80,6 +82,18 @@ func (s *byConfidence) Less(i, j int) bool {
 	if s.results[i].ConfidenceIndex() > s.results[j].ConfidenceIndex() {
 		return true
 	}
-	// confidence is equal; sort by hit count
+
+	// confidence is equal; sort by top score in results
+	maxScoreI, _ := s.results[i].Debug["max_score"].(float64)
+	maxScoreJ, _ := s.results[j].Debug["max_score"].(float64)
+	if maxScoreI < maxScoreJ {
+		return false
+	}
+
+	if maxScoreI > maxScoreJ {
+		return true
+	}
+
+	// last effort, go by total results
 	return s.results[i].Pagination.Total > s.results[j].Pagination.Total
 }

@@ -23,7 +23,7 @@ require (
 	github.com/uvalib/virgo4-parser v0.0.0-20201007173123-bbeb80856433
 	github.com/zsais/go-gin-prometheus v0.1.0
 	golang.org/x/crypto v0.0.0-20201016220609-9e8e0b390897 // indirect
-	golang.org/x/sys v0.0.0-20201018230417-eeed37f84f13 // indirect
+	golang.org/x/sys v0.0.0-20201020230747-6e5568b54d1a // indirect
 	golang.org/x/text v0.3.3
 	google.golang.org/protobuf v1.25.0 // indirect
 )

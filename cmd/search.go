@@ -119,9 +119,11 @@ func (svc *ServiceContext) Search(c *gin.Context) {
 	// sort pool results
 	// poolSort := byName{results: out.Results}
 	if c.Query("sources") != "default" {
+		log.Printf("Sort results by sequence")
 		poolSort := bySequence{results: out.Results, pools: pools}
 		sort.Sort(&poolSort)
 	} else {
+		log.Printf("Sort results by confidence")
 		poolSort := byConfidence{results: out.Results, targetURL: req.Preferences.TargetPool}
 		sort.Sort(&poolSort)
 	}
@@ -165,7 +167,8 @@ func (svc *ServiceContext) getSuggestions(url string, query string, headers map[
 // Goroutine to do a pool search and return the PoolResults on the channel
 func (svc *ServiceContext) searchPool(pool *pool, req clientSearchRequest, headers map[string]string, channel chan *v4api.PoolResult) {
 	// Master search always uses the Private URL to communicate with pools
-	sURL := fmt.Sprintf("%s/api/search", pool.PrivateURL)
+	// NOTE: Sending the debug QP to get max_score info from each pool
+	sURL := fmt.Sprintf("%s/api/search?debug=1", pool.PrivateURL)
 
 	// only send filter group applicable to this pool (if any)
 	poolReq := req
