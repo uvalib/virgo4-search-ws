@@ -31,6 +31,7 @@ type ServiceContext struct {
 	I18NBundle     *i18n.Bundle
 	HTTPClient     *http.Client
 	FastHTTPClient *http.Client
+	SlowHTTPClient *http.Client
 }
 
 // InitializeService will initialize the service context based on the config parameters.
@@ -76,6 +77,10 @@ func InitializeService(version string, cfg *ServiceConfig) *ServiceContext {
 	svc.FastHTTPClient = &http.Client{
 		Transport: defaultTransport,
 		Timeout:   5 * time.Second,
+	}
+	svc.SlowHTTPClient = &http.Client{
+		Transport: defaultTransport,
+		Timeout:   30 * time.Second,
 	}
 
 	return &svc
@@ -221,7 +226,7 @@ func (svc *ServiceContext) solrPost(query string, jsonReq interface{}) ([]byte, 
 
 	log.Printf("Solr POST request: %s", url)
 	startTime := time.Now()
-	rawResp, rawErr := svc.FastHTTPClient.Do(req)
+	rawResp, rawErr := svc.SlowHTTPClient.Do(req)
 	resp, err := handleAPIResponse(url, rawResp, rawErr)
 	elapsedNanoSec := time.Since(startTime)
 	elapsedMS := int64(elapsedNanoSec / time.Millisecond)

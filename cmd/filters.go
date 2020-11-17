@@ -5,9 +5,9 @@ import (
 	"log"
 	"net/http"
 
-	"github.com/mitchellh/mapstructure"
-
 	"github.com/gin-gonic/gin"
+	"github.com/mitchellh/mapstructure"
+	"github.com/uvalib/virgo4-api/v4api"
 )
 
 type solrRequestParams struct {
@@ -33,16 +33,28 @@ func (svc *ServiceContext) GetSearchFilters(c *gin.Context) {
 	log.Printf("Get advanced search filters")
 
 	type filterCfg struct {
-		field string // the Solr field to facet on
-		sort  string // "count" or "alpha"
-		limit int    // -1 for unlimited
+		id     string // the global filter id
+		label  string // the label shown in client
+		source string // the source of data for this pool
+		field  string // the Solr field to facet on
+		sort   string // "count" or "alpha"
+		limit  int    // -1 for unlimited
 	}
 
 	// advanced search filter config
-	reqFilters := make(map[string]filterCfg)
+	var reqFilters []filterCfg
 
-	reqFilters["Collection"] = filterCfg{field: "source_f", sort: "count", limit: -1}
-	//reqFilters["Series"] = filterCfg{field: "title_series_f", sort: "count", limit: 500}
+	reqFilters = append(reqFilters, filterCfg{id: "FilterLibrary", label: "Library", field: "library_f", source: "solr", sort: "index", limit: -1})
+	reqFilters = append(reqFilters, filterCfg{id: "FilterFormat", label: "Format", field: "format_f", source: "solr", sort: "index", limit: -1})
+	reqFilters = append(reqFilters, filterCfg{id: "FilterCollection", label: "Collection", field: "source_f", source: "solr", sort: "index", limit: -1})
+	reqFilters = append(reqFilters, filterCfg{id: "FilterDigitalCollection", label: "Digital Collection", field: "digital_collection_f", source: "solr", sort: "index", limit: -1})
+	reqFilters = append(reqFilters, filterCfg{id: "FilterCallNumberRange", label: "Call Number Range", field: "call_number_narrow_f", source: "solr", sort: "index", limit: -1})
+	reqFilters = append(reqFilters, filterCfg{id: "FilterLanguage", label: "Language", field: "language_f", source: "solr", sort: "count", limit: -1})
+	reqFilters = append(reqFilters, filterCfg{id: "FilterGeographicLocation", label: "Geographic Location", field: "region_f", source: "solr", sort: "count", limit: 500})
+	reqFilters = append(reqFilters, filterCfg{id: "FilterPermissions", label: "Permissions", field: "use_f", source: "solr", sort: "index", limit: -1})
+	reqFilters = append(reqFilters, filterCfg{id: "FilterLicense", label: "License", field: "license_class_f", source: "solr", sort: "index", limit: -1})
+	reqFilters = append(reqFilters, filterCfg{id: "FilterFundCode", label: "Fund Code", field: "fund_code_f", source: "solr", sort: "index", limit: -1})
+	reqFilters = append(reqFilters, filterCfg{id: "FilterShelfLocation", label: "Shelf Location", field: "location2_f", source: "solr", sort: "index", limit: -1})
 
 	// create Solr request
 	var req solrRequest
@@ -50,8 +62,8 @@ func (svc *ServiceContext) GetSearchFilters(c *gin.Context) {
 	req.Params = solrRequestParams{Q: "*:*", Rows: 0, Fq: []string{"+shadowed_location_f:VISIBLE"}}
 
 	req.Facets = make(map[string]solrRequestFacet)
-	for label, config := range reqFilters {
-		req.Facets[label] = solrRequestFacet{Type: "terms", Field: config.field, Sort: config.sort, Limit: config.limit}
+	for _, config := range reqFilters {
+		req.Facets[config.id] = solrRequestFacet{Type: "terms", Field: config.field, Sort: config.sort, Limit: config.limit}
 	}
 
 	// send the request
@@ -64,7 +76,8 @@ func (svc *ServiceContext) GetSearchFilters(c *gin.Context) {
 	// the structure of a Solr response facet
 	type solrResponseFacet struct {
 		Buckets []struct {
-			Val string `json:"val"`
+			Val   string `json:"val"`
+			Count int    `json:"count"`
 		} `json:"buckets,omitempty"`
 	}
 
@@ -80,33 +93,31 @@ func (svc *ServiceContext) GetSearchFilters(c *gin.Context) {
 		return
 	}
 
-	// build response
-	type filter struct {
-		Label  string   `json:"label"`
-		Field  string   `json:"field"`
-		Values []string `json:"values"`
-	}
+	// build response array
 
-	out := make([]filter, 0)
+	filters := []v4api.QueryFilter{}
 
-	for label, config := range reqFilters {
+	for _, config := range reqFilters {
 		var facet solrResponseFacet
 
 		cfg := &mapstructure.DecoderConfig{Metadata: nil, Result: &facet, TagName: "json", ZeroFields: true}
 		dec, _ := mapstructure.NewDecoder(cfg)
 
-		if mapDecErr := dec.Decode(solrResp.Facets[label]); mapDecErr != nil {
+		if mapDecErr := dec.Decode(solrResp.Facets[config.id]); mapDecErr != nil {
 			// probably want to error handle, but for now, just drop this field
 			continue
 		}
 
-		var buckets []string
+		sources := []string{config.source}
+		filterValues := []v4api.QueryFilterValue{}
+
 		for _, bucket := range facet.Buckets {
-			buckets = append(buckets, bucket.Val)
+			filterValue := v4api.QueryFilterValue{Value: bucket.Val, Count: bucket.Count}
+			filterValues = append(filterValues, filterValue)
 		}
 
-		out = append(out, filter{Label: label, Field: config.field, Values: buckets})
+		filters = append(filters, v4api.QueryFilter{ID: config.id, Label: config.label, Sources: sources, Values: filterValues})
 	}
 
-	c.JSON(http.StatusOK, out)
+	c.JSON(http.StatusOK, filters)
 }
