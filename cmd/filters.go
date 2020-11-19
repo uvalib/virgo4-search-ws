@@ -7,10 +7,11 @@ import (
 	"net/http"
 	"sort"
 	"strings"
+	"time"
 
 	"github.com/gin-gonic/gin"
-	"github.com/nicksnyder/go-i18n/v2/i18n"
 	"github.com/uvalib/virgo4-api/v4api"
+	"github.com/uvalib/virgo4-jwt/v4jwt"
 )
 
 type filterResponse struct {
@@ -18,22 +19,40 @@ type filterResponse struct {
 	filters *v4api.PoolFacets
 }
 
-// GetSearchFilters will return all available advanced search filters
-func (svc *ServiceContext) GetSearchFilters(c *gin.Context) {
-	log.Printf("Get advanced search filters")
+type filterCache struct {
+	svc             *ServiceContext
+	refreshInterval int
+	currentFilters  []v4api.QueryFilter
+}
 
-	acceptLang := c.GetHeader("Accept-Language")
-	if acceptLang == "" {
-		acceptLang = "en-US"
+func newFilterCache(svc *ServiceContext, interval int) *filterCache {
+	cache := filterCache{
+		svc:             svc,
+		refreshInterval: interval,
+		currentFilters:  []v4api.QueryFilter{},
 	}
-	localizer := i18n.NewLocalizer(svc.I18NBundle, acceptLang)
 
-	// Pools have already been placed in request context by poolsMiddleware. Get them or fail
-	pools := getPoolsFromContext(c)
-	if len(pools) == 0 {
-		err := searchError{Message: localizer.MustLocalize(&i18n.LocalizeConfig{MessageID: "NoPools"}),
-			Details: ""}
-		c.JSON(http.StatusInternalServerError, err)
+	go cache.monitorFilters()
+
+	return &cache
+}
+
+func (f *filterCache) monitorFilters() {
+	for {
+		f.refreshCache()
+		log.Printf("[FILTERS] refresh scheduled in %d seconds", f.refreshInterval)
+		time.Sleep(time.Duration(f.refreshInterval) * time.Second)
+	}
+}
+
+func (f *filterCache) refreshCache() {
+	log.Printf("[FILTERS] refreshing filters...")
+
+	acceptLang := "en-US"
+
+	pools, err := f.svc.lookupPools(acceptLang, "default")
+	if err != nil {
+		log.Printf("[FILTERS] ERROR: Unable to get default pools: %+v", err)
 		return
 	}
 
@@ -53,9 +72,9 @@ func (svc *ServiceContext) GetSearchFilters(c *gin.Context) {
 	for _, source := range sources {
 		for _, pool := range pools {
 			if pool.V4ID.Source == source {
-				log.Printf("source [%s] => pool [%s]", source, pool.V4ID.ID)
+				log.Printf("[FILTERS] source [%s] will query pool [%s]", source, pool.V4ID.ID)
 				outstandingRequests++
-				go getPoolFilters(c, pool, acceptLang, channel, svc.SlowHTTPClient)
+				go f.getPoolFilters(pool, acceptLang, channel, f.svc.SlowHTTPClient)
 				break
 			}
 		}
@@ -63,10 +82,16 @@ func (svc *ServiceContext) GetSearchFilters(c *gin.Context) {
 
 	for outstandingRequests > 0 {
 		filterResp := <-channel
-		if filterResp != nil {
+		if filterResp.filters != nil {
 			filterResps[filterResp.pool.V4ID.Source] = filterResp
 		}
 		outstandingRequests--
+	}
+
+	// sanity check: only update if we received as many responses as there are sources
+	if len(filterResps) != len(sources) {
+		log.Printf("[FILTERS] not all sources returned filters; skipping refresh")
+		return
 	}
 
 	// merge filter lists from each representative pool
@@ -87,6 +112,9 @@ func (svc *ServiceContext) GetSearchFilters(c *gin.Context) {
 		}
 
 		for _, facet := range filterResp.filters.FacetList {
+			log.Printf("[FILTERS] source [%s] provided filter: [%s] (%d values)",
+				filterResp.pool.V4ID.Source, facet.ID, len(facet.Buckets))
+
 			single := singleFilter{
 				source: filterResp.pool.V4ID.Source,
 				filter: facet,
@@ -160,25 +188,46 @@ func (svc *ServiceContext) GetSearchFilters(c *gin.Context) {
 
 		queryFilter.Values = buckets
 
+		log.Printf("[FILTERS] created merged filter: [%s] (%d values)", queryFilter.ID, len(queryFilter.Values))
+
 		combined = append(combined, queryFilter)
 	}
 
-	c.JSON(http.StatusOK, combined)
+	f.currentFilters = combined
+}
+
+func (f *filterCache) getFilters() []v4api.QueryFilter {
+	return f.currentFilters
+}
+
+// GetSearchFilters will return all available advanced search filters
+func (svc *ServiceContext) GetSearchFilters(c *gin.Context) {
+	log.Printf("Get advanced search filters")
+	c.JSON(http.StatusOK, svc.FilterCache.getFilters())
 }
 
 // Goroutine to do a pool pre-search filter lookup and return the results over a channel
-func getPoolFilters(c *gin.Context, pool *pool, language string, channel chan *filterResponse, httpClient *http.Client) {
+func (f *filterCache) getPoolFilters(pool *pool, language string, channel chan *filterResponse, httpClient *http.Client) {
 	var method string
 	var endpoint string
 	var v4query []byte
 	var includeFilters map[string]bool
 
-	headers := map[string]string{
-		"Accept-Language": language,
-		"Authorization":   c.GetHeader("Authorization"),
+	chanResp := &filterResponse{pool: pool}
+
+	claims := v4jwt.V4Claims{IsUVA: true}
+
+	token, jwtErr := v4jwt.Mint(claims, 5*time.Minute, f.svc.JWTKey)
+	if jwtErr != nil {
+		log.Printf("[FILTERS] ERROR: failed to mint JWT: %s", jwtErr.Error())
+		channel <- chanResp
+		return
 	}
 
-	chanResp := &filterResponse{pool: pool}
+	headers := map[string]string{
+		"Accept-Language": language,
+		"Authorization":   fmt.Sprintf("Bearer %s", token),
+	}
 
 	switch pool.V4ID.Source {
 	case "eds":
@@ -213,7 +262,7 @@ func getPoolFilters(c *gin.Context, pool *pool, language string, channel chan *f
 	var filters v4api.PoolFacets
 	err := json.Unmarshal(resp.Response, &filters)
 	if err != nil {
-		log.Printf("ERROR: Malformed filters response: %s", err.Error())
+		log.Printf("[FILTERS] ERROR: Malformed filters response: %s", err.Error())
 		channel <- chanResp
 		return
 	}

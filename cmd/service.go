@@ -32,6 +32,7 @@ type ServiceContext struct {
 	HTTPClient     *http.Client
 	FastHTTPClient *http.Client
 	SlowHTTPClient *http.Client
+	FilterCache    *filterCache
 }
 
 // InitializeService will initialize the service context based on the config parameters.
@@ -82,6 +83,9 @@ func InitializeService(version string, cfg *ServiceConfig) *ServiceContext {
 		Transport: defaultTransport,
 		Timeout:   30 * time.Second,
 	}
+
+	log.Printf("Init filter cache")
+	svc.FilterCache = newFilterCache(&svc, 300)
 
 	return &svc
 }
