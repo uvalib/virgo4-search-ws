@@ -248,13 +248,16 @@ func (f *filterCache) getPoolFilters(pool *pool, language string, channel chan *
 		endpoint = "api/filters"
 
 	default:
+		log.Printf("[FILTERS] ERROR: unhandled pool source: [%s]", pool.V4ID.Source)
 		channel <- chanResp
+		return
 	}
 
 	url := fmt.Sprintf("%s/%s", pool.PrivateURL, endpoint)
 
 	resp := serviceRequest(method, url, v4query, headers, httpClient)
 	if resp.StatusCode != http.StatusOK {
+		log.Printf("[FILTERS] ERROR: %s pool: http status code: %d", pool.V4ID.Source, resp.StatusCode)
 		channel <- chanResp
 		return
 	}
@@ -262,7 +265,14 @@ func (f *filterCache) getPoolFilters(pool *pool, language string, channel chan *
 	var filters v4api.PoolFacets
 	err := json.Unmarshal(resp.Response, &filters)
 	if err != nil {
-		log.Printf("[FILTERS] ERROR: Malformed filters response: %s", err.Error())
+		log.Printf("[FILTERS] ERROR: %s pool: malformed response: %s", pool.V4ID.Source, err.Error())
+		channel <- chanResp
+		return
+	}
+
+	// ensure there are actually filters (the pools might send empty lists on error)
+	if len(filters.FacetList) == 0 {
+		log.Printf("[FILTERS] ERROR: %s pool: response contains no filters", pool.V4ID.Source)
 		channel <- chanResp
 		return
 	}
