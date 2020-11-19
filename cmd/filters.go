@@ -77,6 +77,7 @@ func (svc *ServiceContext) GetSearchFilters(c *gin.Context) {
 	}
 
 	filterMap := make(map[string][]singleFilter)
+	filterOrder := []string{}
 
 	// collect source/filter list for each filter ID
 	for _, source := range sources {
@@ -91,6 +92,7 @@ func (svc *ServiceContext) GetSearchFilters(c *gin.Context) {
 				filter: facet,
 			}
 
+			filterOrder = append(filterOrder, facet.ID)
 			filterMap[facet.ID] = append(filterMap[facet.ID], single)
 		}
 	}
@@ -98,15 +100,16 @@ func (svc *ServiceContext) GetSearchFilters(c *gin.Context) {
 	combined := []v4api.QueryFilter{}
 
 	// combine filter lists for each filter ID
-	for filterID, filterList := range filterMap {
+	for _, filterID := range filterOrder {
+		filterList := filterMap[filterID]
+
 		queryFilter := v4api.QueryFilter{ID: filterID}
 		bucketSort := ""
 
-		sourcesMap := make(map[string]bool)
 		valuesMap := make(map[string]int)
 
 		for _, filter := range filterList {
-			sourcesMap[filter.source] = true
+			queryFilter.Sources = append(queryFilter.Sources, filter.source)
 
 			// first source to label this filter wins
 			if queryFilter.Label == "" && filter.filter.Name != "" {
@@ -122,11 +125,6 @@ func (svc *ServiceContext) GetSearchFilters(c *gin.Context) {
 			for _, bucket := range filter.filter.Buckets {
 				valuesMap[bucket.Value] += bucket.Count
 			}
-		}
-
-		// add sources that contributed to this filter
-		for source := range sourcesMap {
-			queryFilter.Sources = append(queryFilter.Sources, source)
 		}
 
 		// build and sort bucket list
