@@ -25,10 +25,10 @@ func (svc *ServiceContext) Search(c *gin.Context) {
 	localizer := i18n.NewLocalizer(svc.I18NBundle, acceptLang)
 
 	var req clientSearchRequest
-	if err := c.BindJSON(&req); err != nil {
-		log.Printf("ERROR: Unable to parse search request: %s", err.Error())
+	if jsonErr := c.BindJSON(&req); jsonErr != nil {
+		log.Printf("ERROR: Unable to parse search request: %s", jsonErr.Error())
 		err := searchError{Message: localizer.MustLocalize(&i18n.LocalizeConfig{MessageID: "BadSearch"}),
-			Details: err.Error()}
+			Details: jsonErr.Error()}
 		c.JSON(http.StatusBadRequest, err)
 		return
 	}

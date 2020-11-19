@@ -55,7 +55,7 @@ func main() {
 		api.POST("/pdf", svc.AuthMiddleware, svc.PoolsMiddleware, svc.GeneratePDF)
 		api.GET("/pools", svc.PoolsMiddleware, svc.GetPoolsRequest)
 		api.POST("/search", svc.AuthMiddleware, svc.PoolsMiddleware, svc.Search)
-		api.GET("/filters", svc.AuthMiddleware, svc.GetSearchFilters)
+		api.GET("/filters", svc.AuthMiddleware, svc.PoolsMiddleware, svc.GetSearchFilters)
 	}
 
 	if admin := router.Group("/admin", svc.AuthMiddleware, svc.AdminMiddleware); admin != nil {
