@@ -120,7 +120,10 @@ func (f *filterCache) refreshCache() {
 				filter: facet,
 			}
 
-			filterOrder = append(filterOrder, facet.ID)
+			if len(filterMap[facet.ID]) == 0 {
+				filterOrder = append(filterOrder, facet.ID)
+			}
+
 			filterMap[facet.ID] = append(filterMap[facet.ID], single)
 		}
 	}
