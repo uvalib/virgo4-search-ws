@@ -79,7 +79,7 @@ func PoolExists(identifier string, pools []*pool) bool {
 // Any pools that fail the /identify call will not be included
 func (svc *ServiceContext) lookupPools(language string, srcSet string) ([]*pool, error) {
 	pools := make([]*pool, 0)
-	q := svc.DB.NewQuery(` select s.*, t.sequence from sources s inner join source_sets t on t.source_id=s.id where t.name={:set} and s.enabled=true order by sequence asc`)
+	q := svc.DB.NewQuery(` select s.*, t.sequence from sources s inner join source_sets t on t.source_id=s.id where t.name={:set} and s.enabled=true order by t.sequence asc`)
 	q.Bind(dbx.Params{"set": srcSet})
 	rows, err := q.Rows()
 	if err != nil {
