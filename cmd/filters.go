@@ -50,7 +50,7 @@ func (f *filterCache) refreshCache() {
 
 	acceptLang := "en-US"
 
-	pools, err := f.svc.lookupPools(acceptLang, "default")
+	pools, err := f.svc.lookupPools(acceptLang)
 	if err != nil {
 		log.Printf("[FILTERS] ERROR: Unable to get default pools: %+v", err)
 		return

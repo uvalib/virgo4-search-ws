@@ -9,7 +9,6 @@ import (
 	"net/http"
 	"time"
 
-	dbx "github.com/go-ozzo/ozzo-dbx"
 	"github.com/uvalib/virgo4-api/v4api"
 
 	"github.com/gin-gonic/gin"
@@ -19,27 +18,22 @@ import (
 // If found it looks up all pools in that source set. If not found, the default pool set is looked up.
 // Results placed in the request context for use by later handlers
 func (svc *ServiceContext) PoolsMiddleware(c *gin.Context) {
-	srcSet := c.Query("sources")
-	if srcSet == "" {
-		srcSet = "default"
-	}
-
 	acceptLang := c.GetHeader("Accept-Language")
 	if acceptLang == "" {
 		acceptLang = "en-US"
 	}
 
-	log.Printf("Pools Middleware: get %s pools", srcSet)
+	log.Printf("Pools Middleware: get pools")
 	start := time.Now()
-	pools, err := svc.lookupPools(acceptLang, srcSet)
+	pools, err := svc.lookupPools(acceptLang)
 	if err != nil {
-		log.Printf("ERROR: Unable to get %s pools: %+v", srcSet, err)
+		log.Printf("ERROR: Unable to get pools: %+v", err)
 		c.AbortWithStatus(http.StatusNotFound)
 		return
 	}
 	elapsed := time.Since(start)
 	elapsedMS := int64(elapsed / time.Millisecond)
-	log.Printf("SUCCESS: %d %s pools found in %dms", len(pools), srcSet, elapsedMS)
+	log.Printf("SUCCESS: %d pools found in %dms", len(pools), elapsedMS)
 	c.Set("pools", pools)
 }
 
@@ -65,22 +59,11 @@ func (svc *ServiceContext) GetPoolsRequest(c *gin.Context) {
 	c.JSON(http.StatusOK, out)
 }
 
-// PoolExists checks if a pool with the given identifier (URL or Name)
-func PoolExists(identifier string, pools []*pool) bool {
-	for _, p := range pools {
-		if p.V4ID.URL == identifier || p.V4ID.ID == identifier {
-			return true
-		}
-	}
-	return false
-}
-
 // LookupPools fetches a localizes list of current pools the V4DB & pool /identify
 // Any pools that fail the /identify call will not be included
-func (svc *ServiceContext) lookupPools(language string, srcSet string) ([]*pool, error) {
+func (svc *ServiceContext) lookupPools(language string) ([]*pool, error) {
 	pools := make([]*pool, 0)
-	q := svc.DB.NewQuery(` select s.*, t.sequence from sources s inner join source_sets t on t.source_id=s.id where t.name={:set} and s.enabled=true order by sequence asc`)
-	q.Bind(dbx.Params{"set": srcSet})
+	q := svc.DB.NewQuery(`select * from sources where sequence>0 and enabled=true order by sequence asc`)
 	rows, err := q.Rows()
 	if err != nil {
 		log.Printf("ERROR: Unable to get authoritative pool information: %+v", err)

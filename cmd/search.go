@@ -52,15 +52,6 @@ func (svc *ServiceContext) Search(c *gin.Context) {
 		return
 	}
 
-	// Do the search...
-	out := NewSearchResponse(&req)
-	start := time.Now()
-	if req.Preferences.TargetPool != "" && PoolExists(req.Preferences.TargetPool, pools) == false {
-		log.Printf("WARNING: Target Pool %s is not registered", req.Preferences.TargetPool)
-		msg := localizer.MustLocalize(&i18n.LocalizeConfig{MessageID: "TargetPoolUnavailable"})
-		out.Warnings = append(out.Warnings, msg)
-	}
-
 	// headers to send to pool
 	headers := map[string]string{
 		"Content-Type":    "application/json",
@@ -68,20 +59,18 @@ func (svc *ServiceContext) Search(c *gin.Context) {
 		"Authorization":   c.GetHeader("Authorization"),
 	}
 
+	// kick off a request to get suggestions based on search query
 	sugChannel := make(chan []v4api.Suggestion)
 	sugURL := fmt.Sprintf("%s/api/suggest", svc.SuggestorURL)
 	go svc.getSuggestions(sugURL, req.Query, headers, sugChannel)
 
-	// Kick off all pool requests in parallel and wait for all to respond
+	// Do the search...
+	out := NewSearchResponse(&req)
+	start := time.Now()
 	channel := make(chan *v4api.PoolResult)
 	outstandingRequests := 0
 	for _, p := range pools {
 		out.Pools = append(out.Pools, p.V4ID)
-
-		if isPoolExcluded(&req.Preferences, p) {
-			log.Printf("Skipping %s as it is part of the excluded pools list", p.V4ID.URL)
-			continue
-		}
 		outstandingRequests++
 		go svc.searchPool(p, req, headers, channel)
 	}
@@ -116,17 +105,10 @@ func (svc *ServiceContext) Search(c *gin.Context) {
 
 	out.Suggestions = <-sugChannel
 
-	// sort pool results
-	// poolSort := byName{results: out.Results}
-	if c.Query("sources") != "default" {
-		log.Printf("Sort results by sequence")
-		poolSort := bySequence{results: out.Results, pools: pools}
-		sort.Sort(&poolSort)
-	} else {
-		log.Printf("Sort results by confidence")
-		poolSort := byConfidence{results: out.Results, targetURL: req.Preferences.TargetPool}
-		sort.Sort(&poolSort)
-	}
+	// sort pool results by pool sequence
+	log.Printf("Sort results by sequence")
+	poolSort := bySequence{results: out.Results, pools: pools}
+	sort.Sort(&poolSort)
 
 	// Total time for all respones (basically the longest response)
 	elapsed := time.Since(start)
@@ -217,13 +199,4 @@ func (svc *ServiceContext) searchPool(pool *pool, req clientSearchRequest, heade
 	results.ContentLanguage = postResp.ContentLanguage
 
 	channel <- results
-}
-
-func isPoolExcluded(searchPrefs *v4api.SearchPreferences, pool *pool) bool {
-	for _, identifier := range searchPrefs.ExcludePools {
-		if identifier == pool.V4ID.URL || identifier == pool.V4ID.ID {
-			return true
-		}
-	}
-	return false
 }
