@@ -62,7 +62,7 @@ func (f *filterCache) refreshCache() {
 	// attributes of the combined filters, including filter label and sort order.
 	// this is important since a) the solr pools have more translations for shared
 	// filter IDs, and b) only the solr pools currently specify bucket sort order.
-	sources := []string{"solr", "eds"}
+	sources := []string{"solr", "solr-images", "eds"}
 
 	filterResps := make(map[string]*filterResponse)
 
@@ -232,8 +232,8 @@ func (f *filterCache) getPoolFilters(pool *pool, language string, channel chan *
 		"Authorization":   fmt.Sprintf("Bearer %s", token),
 	}
 
-	switch pool.V4ID.Source {
-	case "eds":
+	switch {
+	case pool.V4ID.Source == "eds":
 		method = "POST"
 		endpoint = "api/search/facets"
 		v4query = []byte(`{"query":"keyword:{*}"}`)
@@ -246,7 +246,7 @@ func (f *filterCache) getPoolFilters(pool *pool, language string, channel chan *
 			"SourceType":        true,
 		}
 
-	case "solr":
+	case strings.HasPrefix(pool.V4ID.Source, "solr") == true:
 		method = "GET"
 		endpoint = "api/filters"
 

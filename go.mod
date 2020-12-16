@@ -10,6 +10,7 @@ require (
 	github.com/gin-gonic/gin v1.6.3
 	github.com/go-ozzo/ozzo-dbx v1.5.0
 	github.com/go-playground/validator/v10 v10.4.1 // indirect
+	github.com/leodido/go-urn v1.2.1 // indirect
 	github.com/lib/pq v1.9.0
 	github.com/nicksnyder/go-i18n/v2 v2.1.1
 	github.com/phpdave11/gofpdi v1.0.13 // indirect
@@ -23,7 +24,7 @@ require (
 	github.com/uvalib/virgo4-parser v0.0.0-20201110191926-097433955fee
 	github.com/zsais/go-gin-prometheus v0.1.0
 	golang.org/x/crypto v0.0.0-20201208171446-5f87f3452ae9 // indirect
-	golang.org/x/sys v0.0.0-20201207223542-d4d67f95c62d // indirect
+	golang.org/x/sys v0.0.0-20201214210602-f9fddec55a1e // indirect
 	golang.org/x/text v0.3.4
 	google.golang.org/protobuf v1.25.0 // indirect
 	gopkg.in/yaml.v2 v2.4.0 // indirect
