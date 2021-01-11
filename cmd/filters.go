@@ -152,6 +152,9 @@ func (f *filterCache) refreshCache() {
 				bucketSort = filter.filter.Sort
 			}
 
+			// hide if any source marks this as hidden
+			queryFilter.Hidden = queryFilter.Hidden || filter.filter.Hidden
+
 			// accumulate counts for specific values
 			for _, bucket := range filter.filter.Buckets {
 				valuesMap[bucket.Value] += bucket.Count

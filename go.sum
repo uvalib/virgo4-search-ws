@@ -337,6 +337,8 @@ github.com/uvalib/antlr4 v0.0.0-20200923134101-dff98b67fb18 h1:kq7Z42mUNIhvkL2nE
 github.com/uvalib/antlr4 v0.0.0-20200923134101-dff98b67fb18/go.mod h1:cppH23VknRINksatSXBh5/05/3k5odnMJthcfkzpcZA=
 github.com/uvalib/virgo4-api v0.0.0-20210111184640-c2c4595a693b h1:dUHvOq01rh55pnrLJvXEZFy3Y/N32YPRn6OnQAzc4SM=
 github.com/uvalib/virgo4-api v0.0.0-20210111184640-c2c4595a693b/go.mod h1:p+LmQBQahBom6DErthL8iGZU6NgRJ9aN2wM7EE6VBSE=
+github.com/uvalib/virgo4-api v0.0.0-20210111191046-ddb7c758e656 h1:iTL8x10EXEyBt057McnLH6NKKySaqbwMbYOplStFhvc=
+github.com/uvalib/virgo4-api v0.0.0-20210111191046-ddb7c758e656/go.mod h1:p+LmQBQahBom6DErthL8iGZU6NgRJ9aN2wM7EE6VBSE=
 github.com/uvalib/virgo4-jwt v0.0.0-20200812155832-7443daa580fd h1:ox1gpbYRXB0fFS+JiMa560a6wn4Y5+MrJc4G0ASCk7E=
 github.com/uvalib/virgo4-jwt v0.0.0-20200812155832-7443daa580fd/go.mod h1:pPSHBTeq1RftpQGB6H1GaihwPZtl5RpGCEeov0eH05Y=
 github.com/uvalib/virgo4-parser v0.0.0-20201110191926-097433955fee h1:kLPTSomf7JT3GLCoqKd9xx4NH081pHchmsb8mma2PDs=
