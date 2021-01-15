@@ -73,7 +73,7 @@ func InitializeService(version string, cfg *ServiceConfig) *ServiceContext {
 	}
 	svc.HTTPClient = &http.Client{
 		Transport: defaultTransport,
-		Timeout:   15 * time.Second,
+		Timeout:   10 * time.Second,
 	}
 	svc.FastHTTPClient = &http.Client{
 		Transport: defaultTransport,
