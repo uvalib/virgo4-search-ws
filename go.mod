@@ -20,11 +20,11 @@ require (
 	github.com/sirupsen/logrus v1.7.0 // indirect
 	github.com/ugorji/go v1.2.3 // indirect
 	github.com/uvalib/virgo4-api v0.0.0-20210111191046-ddb7c758e656
-	github.com/uvalib/virgo4-jwt v0.0.0-20200812155832-7443daa580fd
-	github.com/uvalib/virgo4-parser v0.0.0-20201110191926-097433955fee
+	github.com/uvalib/virgo4-jwt v0.0.0-20210129165249-920a9cfd20bd
+	github.com/uvalib/virgo4-parser v0.0.0-20210129215242-63d8e5b136b3
 	github.com/zsais/go-gin-prometheus v0.1.0
 	golang.org/x/crypto v0.0.0-20201221181555-eec23a3978ad // indirect
-	golang.org/x/sys v0.0.0-20210119212857-b64e53b001e4 // indirect
+	golang.org/x/sys v0.0.0-20210124154548-22da62e12c0c // indirect
 	golang.org/x/text v0.3.5
 	google.golang.org/protobuf v1.25.0 // indirect
 	gopkg.in/yaml.v2 v2.4.0 // indirect
