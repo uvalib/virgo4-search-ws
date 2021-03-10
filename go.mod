@@ -22,7 +22,7 @@ require (
 	github.com/ugorji/go v1.2.4 // indirect
 	github.com/uvalib/virgo4-api v0.0.0-20210111191046-ddb7c758e656
 	github.com/uvalib/virgo4-jwt v0.0.0-20210129165249-920a9cfd20bd
-	github.com/uvalib/virgo4-parser v0.0.0-20210309213118-7a93331e0f85
+	github.com/uvalib/virgo4-parser v0.0.0-20210310003057-c2c91a62e7df
 	github.com/zsais/go-gin-prometheus v0.1.0
 	golang.org/x/crypto v0.0.0-20210220033148-5ea612d1eb83 // indirect
 	golang.org/x/sys v0.0.0-20210309074719-68d13333faf2 // indirect
