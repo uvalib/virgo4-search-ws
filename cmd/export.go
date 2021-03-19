@@ -1,7 +1,9 @@
 package main
 
 import (
+	"encoding/csv"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"log"
 	"net/http"
@@ -16,7 +18,7 @@ type requestItem struct {
 	Pool       string `json:"pool"`
 	Identifier string `json:"identifier"`
 }
-type pdfRequest struct {
+type exportRequest struct {
 	Title string        `json:"title"`
 	Notes string        `json:"notes"`
 	Items []requestItem `json:"items"`
@@ -24,33 +26,65 @@ type pdfRequest struct {
 
 type itemDetail struct {
 	Identifier string
+	CallNumber []string
+	Date       string
 	Title      []string
 	Author     []string
 	Library    []string
 	Location   []string
-	CallNumber []string
+	Format     []string
 	StatusCode int
 	Message    string
 	ElapsedMS  int64
 }
 
-// GeneratePDF accepts a list of objects containg pool and identifer as POST data
-// It will generate a PDF containing details about the items that can be used to help find
-// the items in the stacks
-func (svc *ServiceContext) GeneratePDF(c *gin.Context) {
-	var req pdfRequest
+// GenerateCSV accepts a list of objects containg pool and identifer as POST data
+// It will generate CSV containing details about the items
+func (svc *ServiceContext) GenerateCSV(c *gin.Context) {
+	var req exportRequest
 	if err := c.BindJSON(&req); err != nil {
-		log.Printf("ERROR: Unable to parse PDF request: %s", err.Error())
-		c.String(http.StatusBadRequest, "Invalid PDF request")
+		log.Printf("ERROR: Unable to parse CSV request: %s", err.Error())
+		c.String(http.StatusBadRequest, "Invalid CSV request")
 		return
 	}
 
+	start := time.Now()
+	details, err := svc.lookupItems(c, req.Items)
+	elapsed := time.Since(start)
+	elapsedMS := int64(elapsed / time.Millisecond)
+	if err != nil {
+		log.Printf("ERROR: Unable to get CSV item details: %s", err.Error())
+		c.String(http.StatusNotFound, "Unable to find item details")
+		return
+	}
+	log.Printf("SUCCESS: All item details for CSV receieved in %dms", elapsedMS)
+	// disp := fmt.Sprintf("attachment; filename=%s.pdf", req.Title)
+	// c.Header("Content-Disposition", disp)
+	c.Header("Content-Type", "text/csv")
+	cw := csv.NewWriter(c.Writer)
+	csvHead := []string{"title", "author", "library", "location", "call number", "format", "date"}
+	cw.Write(csvHead)
+	for _, item := range details {
+		line := []string{
+			strings.Join(item.Title, "; "),
+			strings.Join(item.Author, "; "),
+			strings.Join(item.Library, "; "),
+			strings.Join(item.Location, "; "),
+			strings.Join(item.CallNumber, "; "),
+			strings.Join(item.Format, "; "),
+			item.Date,
+		}
+		cw.Write(line)
+	}
+
+	cw.Flush()
+}
+
+func (svc *ServiceContext) lookupItems(c *gin.Context, items []requestItem) ([]*itemDetail, error) {
 	// Pools have already been placed in request context by poolsMiddleware. Get them or fail
 	pools := getPoolsFromContext(c)
 	if len(pools) == 0 {
-		log.Printf("ERROR: No pools found for PDF lookup")
-		c.String(http.StatusNotFound, "Unable to find item details")
-		return
+		return nil, errors.New("No pools found")
 	}
 
 	acceptLang := c.GetHeader("Accept-Language")
@@ -64,27 +98,10 @@ func (svc *ServiceContext) GeneratePDF(c *gin.Context) {
 		"Authorization":   c.GetHeader("Authorization"),
 	}
 
-	pdf := gopdf.GoPdf{}
-	pdf.Start(gopdf.Config{PageSize: *gopdf.PageSizeA4}) // W: 595, H: 842
-	pdf.AddPage()
-	err := pdf.AddTTFFont("osr", "./ttf/OpenSans-Regular.ttf")
-	if err != nil {
-		log.Printf("ERROR: Unable to load PDF font %s", err.Error())
-		c.String(http.StatusInternalServerError, "Unable to generate PDF")
-		return
-	}
-	err = pdf.AddTTFFont("osb", "./ttf/OpenSans-Bold.ttf")
-	if err != nil {
-		log.Printf("ERROR: Unable to load PDF bold font %s", err.Error())
-		c.String(http.StatusInternalServerError, "Unable to generate PDF")
-		return
-	}
-
 	// Kick off all pool requests in parallel and wait for all to respond
-	start := time.Now()
 	channel := make(chan *itemDetail)
 	outstandingRequests := 0
-	for _, item := range req.Items {
+	for _, item := range items {
 		outstandingRequests++
 		pool := getPool(pools, item.Pool)
 		if pool == nil {
@@ -104,8 +121,45 @@ func (svc *ServiceContext) GeneratePDF(c *gin.Context) {
 		outstandingRequests--
 	}
 
+	return out, nil
+}
+
+// GeneratePDF accepts a list of objects containg pool and identifer as POST data
+// It will generate a PDF containing details about the items that can be used to help find
+// the items in the stacks
+func (svc *ServiceContext) GeneratePDF(c *gin.Context) {
+	var req exportRequest
+	if err := c.BindJSON(&req); err != nil {
+		log.Printf("ERROR: Unable to parse PDF request: %s", err.Error())
+		c.String(http.StatusBadRequest, "Invalid PDF request")
+		return
+	}
+
+	pdf := gopdf.GoPdf{}
+	pdf.Start(gopdf.Config{PageSize: *gopdf.PageSizeA4}) // W: 595, H: 842
+	pdf.AddPage()
+	err := pdf.AddTTFFont("osr", "./ttf/OpenSans-Regular.ttf")
+	if err != nil {
+		log.Printf("ERROR: Unable to load PDF font %s", err.Error())
+		c.String(http.StatusInternalServerError, "Unable to generate PDF")
+		return
+	}
+	err = pdf.AddTTFFont("osb", "./ttf/OpenSans-Bold.ttf")
+	if err != nil {
+		log.Printf("ERROR: Unable to load PDF bold font %s", err.Error())
+		c.String(http.StatusInternalServerError, "Unable to generate PDF")
+		return
+	}
+
+	start := time.Now()
+	out, err := svc.lookupItems(c, req.Items)
 	elapsed := time.Since(start)
 	elapsedMS := int64(elapsed / time.Millisecond)
+	if err != nil {
+		log.Printf("ERROR: Unable to get PDF item details: %s", err.Error())
+		c.String(http.StatusNotFound, "Unable to find item details")
+		return
+	}
 	log.Printf("SUCCESS: All item details for printout receieved in %dms", elapsedMS)
 
 	// render the PDF..
@@ -214,6 +268,12 @@ func (svc *ServiceContext) getDetails(item requestItem, pool *pool, headers map[
 		}
 		if field.Name == "library" {
 			respItem.Library = append(respItem.Library, field.Value)
+		}
+		if field.Name == "format" {
+			respItem.Format = append(respItem.Format, field.Value)
+		}
+		if field.Name == "published_date" {
+			respItem.Date = field.Value
 		}
 		if field.Name == "location" {
 			if field.Value != "By Request" {
