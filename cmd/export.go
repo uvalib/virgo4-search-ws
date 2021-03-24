@@ -26,6 +26,7 @@ type exportRequest struct {
 
 type itemDetail struct {
 	Identifier string
+	Pool       string
 	CallNumber []string
 	Date       string
 	Title      []string
@@ -48,6 +49,14 @@ func (svc *ServiceContext) GenerateCSV(c *gin.Context) {
 		return
 	}
 
+	// Notes is used to pass in the base URL of the request. Need
+	// it to generate the full item details URL
+	if req.Notes == "" {
+		log.Printf("ERROR: Missing required notes field")
+		c.String(http.StatusBadRequest, "Invalid CSV request")
+		return
+	}
+
 	start := time.Now()
 	details, err := svc.lookupItems(c, req.Items)
 	elapsed := time.Since(start)
@@ -58,13 +67,13 @@ func (svc *ServiceContext) GenerateCSV(c *gin.Context) {
 		return
 	}
 	log.Printf("SUCCESS: All item details for CSV receieved in %dms", elapsedMS)
-	// disp := fmt.Sprintf("attachment; filename=%s.pdf", req.Title)
-	// c.Header("Content-Disposition", disp)
 	c.Header("Content-Type", "text/csv")
 	cw := csv.NewWriter(c.Writer)
-	csvHead := []string{"title", "author", "library", "location", "call number", "format", "date"}
+	csvHead := []string{"title", "author", "library", "location", "call number", "format", "date", "url"}
 	cw.Write(csvHead)
+	baseURL := req.Notes
 	for _, item := range details {
+		url := fmt.Sprintf("%s/sources/%s/items/%s", baseURL, item.Pool, item.Identifier)
 		line := []string{
 			strings.Join(item.Title, "; "),
 			strings.Join(item.Author, "; "),
@@ -73,6 +82,7 @@ func (svc *ServiceContext) GenerateCSV(c *gin.Context) {
 			strings.Join(item.CallNumber, "; "),
 			strings.Join(item.Format, "; "),
 			item.Date,
+			url,
 		}
 		cw.Write(line)
 	}
@@ -235,7 +245,7 @@ func getPool(pools []*pool, identifier string) *pool {
 func (svc *ServiceContext) getDetails(item requestItem, pool *pool, headers map[string]string, channel chan *itemDetail) {
 	url := fmt.Sprintf("%s/api/resource/%s", pool.PrivateURL, item.Identifier)
 	resp := serviceRequest("GET", url, nil, headers, svc.HTTPClient)
-	respItem := &itemDetail{StatusCode: resp.StatusCode, ElapsedMS: resp.ElapsedMS, Identifier: item.Identifier}
+	respItem := &itemDetail{StatusCode: resp.StatusCode, ElapsedMS: resp.ElapsedMS, Identifier: item.Identifier, Pool: pool.V4ID.ID}
 	if respItem.StatusCode != http.StatusOK {
 		channel <- respItem
 		return
