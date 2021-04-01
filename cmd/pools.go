@@ -51,9 +51,18 @@ func getPoolsFromContext(c *gin.Context) []*pool {
 // descriptive information localized to match the Accept-Language header. Fallback is en-US
 func (svc *ServiceContext) GetPoolsRequest(c *gin.Context) {
 	pools := getPoolsFromContext(c)
-	out := make([]v4api.PoolIdentity, 0)
+	out := make([]*poolResponse, 0)
+	channel := make(chan *poolResponse)
+	outstandingRequests := 0
 	for _, p := range pools {
-		out = append(out, p.V4ID)
+		outstandingRequests++
+		go poolProviders(&p.V4ID, channel, svc.FastHTTPClient)
+	}
+
+	for outstandingRequests > 0 {
+		poolResp := <-channel
+		out = append(out, poolResp)
+		outstandingRequests--
 	}
 
 	c.JSON(http.StatusOK, out)
@@ -155,4 +164,39 @@ func identifyPool(dbp *dbPool, language string, channel chan *identifyResult, ht
 	} else {
 		channel <- &identifyResult{Pool: &identity, Error: nil}
 	}
+}
+
+// Goroutine to get pool providers, append them to pool data and return result
+func poolProviders(pool *v4api.PoolIdentity, channel chan *poolResponse, httpClient *http.Client) {
+	log.Printf("Get pool providers for %s", pool.ID)
+	poolRes := poolResponse{PoolIdentity: pool}
+	URL := fmt.Sprintf("%s/api/providers", pool.URL)
+	provReq, reqErr := http.NewRequest("GET", URL, nil)
+	if reqErr != nil {
+		log.Printf("ERROR: Unable to generate identify request for %s", URL)
+		channel <- &poolRes
+		return
+	}
+	resp, err := httpClient.Do(provReq)
+	if err != nil {
+		log.Printf("ERROR: %s failed: %s", URL, err.Error())
+		channel <- &poolRes
+		return
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != 200 {
+		log.Printf("ERROR: %s returned bad status code : %d: ", URL, resp.StatusCode)
+		channel <- &poolRes
+		return
+	}
+	respTxt, _ := ioutil.ReadAll(resp.Body)
+	var prov v4api.PoolProviders
+	err = json.Unmarshal(respTxt, &prov)
+	if err != nil {
+		log.Printf("ERROR: %s returned invalid data: %s: ", URL, err.Error())
+		channel <- &poolRes
+		return
+	}
+	poolRes.Providers = &prov.Providers
+	channel <- &poolRes
 }

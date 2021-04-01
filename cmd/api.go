@@ -20,6 +20,12 @@ type pool struct {
 	Sequence   int    `json:"-"`
 }
 
+// poolResponse contains pool identity and providers details
+type poolResponse struct {
+	*v4api.PoolIdentity
+	Providers *[]v4api.Provider `json:"providers"`
+}
+
 type poolSort struct {
 	PoolID string          `json:"poolID"`
 	Sort   v4api.SortOrder `json:"sort"`
