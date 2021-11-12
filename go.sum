@@ -40,9 +40,8 @@ github.com/alecthomas/template v0.0.0-20190718012654-fb15b899a751/go.mod h1:LOuy
 github.com/alecthomas/units v0.0.0-20151022065526-2efee857e7cf/go.mod h1:ybxpYRFXyAe+OPACYpWeL0wqObRcbAqCMya13uyzqw0=
 github.com/alecthomas/units v0.0.0-20190717042225-c3de453c63f4/go.mod h1:ybxpYRFXyAe+OPACYpWeL0wqObRcbAqCMya13uyzqw0=
 github.com/alecthomas/units v0.0.0-20190924025748-f65c72e2690d/go.mod h1:rBZYJk541a8SKzHPHnH3zbiI+7dagKZ0cgpgrD7Fyho=
-github.com/antlr/antlr4/runtime/Go/antlr v0.0.0-20210907221601-4f80a5e09cd0/go.mod h1:F7bn7fEU90QkQ3tnmaTx3LTKLEDqnwWODIYppRQ5hnY=
-github.com/antlr/antlr4/runtime/Go/antlr v0.0.0-20210914074925-ce3c483ec505 h1:0EIn0z+ULLxOcyq7NmbqHlOxh/HGcZiU039t+SV/aO4=
-github.com/antlr/antlr4/runtime/Go/antlr v0.0.0-20210914074925-ce3c483ec505/go.mod h1:F7bn7fEU90QkQ3tnmaTx3LTKLEDqnwWODIYppRQ5hnY=
+github.com/antlr/antlr4/runtime/Go/antlr v0.0.0-20211106181442-e4c1a74c66bd h1:fjJY1LimH0wVCvOHLX35SCX/MbWomAglET1H2kvz7xc=
+github.com/antlr/antlr4/runtime/Go/antlr v0.0.0-20211106181442-e4c1a74c66bd/go.mod h1:F7bn7fEU90QkQ3tnmaTx3LTKLEDqnwWODIYppRQ5hnY=
 github.com/beorn7/perks v0.0.0-20180321164747-3a771d992973/go.mod h1:Dwedo/Wpr24TaqPxmxbtue+5NUziq4I4S80YR8gNf3Q=
 github.com/beorn7/perks v1.0.0/go.mod h1:KWe93zE9D1o94FZ5RNwFwVgaQK1VOXiVxmqh+CedLV8=
 github.com/beorn7/perks v1.0.1 h1:VlbKKnNfV8bJzeqoa4cOKqO6bYr3WgKZxO8Z16+hsOM=
@@ -271,8 +270,8 @@ github.com/uvalib/virgo4-api v0.0.0-20210111191046-ddb7c758e656 h1:iTL8x10EXEyBt
 github.com/uvalib/virgo4-api v0.0.0-20210111191046-ddb7c758e656/go.mod h1:p+LmQBQahBom6DErthL8iGZU6NgRJ9aN2wM7EE6VBSE=
 github.com/uvalib/virgo4-jwt v0.0.0-20210923181633-fe8108b1457d h1:XM7ZK/ykL5bBx89O9aZhT2fjsev75+BEQXpSPDCcO+0=
 github.com/uvalib/virgo4-jwt v0.0.0-20210923181633-fe8108b1457d/go.mod h1:3pcQ+XdN3q29AExajOiWzASmTGOXsfeEDOKh5VxEKXU=
-github.com/uvalib/virgo4-parser v0.0.0-20210910210342-c8c0377ed87a h1:AN5xwTkdHQ34UIVQzVoa+x0BK2wunfaVSJPxex0YOCw=
-github.com/uvalib/virgo4-parser v0.0.0-20210910210342-c8c0377ed87a/go.mod h1:Psyg3eb/YaOxMUpxxU/Su05z+mOt6IAyahYHr/VnFW4=
+github.com/uvalib/virgo4-parser v0.0.0-20211112015059-f96dfc5c6463 h1:eaYWIg2S0GaXLlQCJCQ2e98SuhcAhM2fORAsKnwsnj0=
+github.com/uvalib/virgo4-parser v0.0.0-20211112015059-f96dfc5c6463/go.mod h1:CFoN7kD44gfnzOd/kI3fhsaBqV+8IEveZu3y4i6/yGc=
 github.com/yuin/goldmark v1.1.25/go.mod h1:3hX8gzYuyVAZsxl0MRgGTJEmQBFcNTphYh9decYSb74=
 github.com/yuin/goldmark v1.1.27/go.mod h1:3hX8gzYuyVAZsxl0MRgGTJEmQBFcNTphYh9decYSb74=
 github.com/yuin/goldmark v1.1.32/go.mod h1:3hX8gzYuyVAZsxl0MRgGTJEmQBFcNTphYh9decYSb74=
