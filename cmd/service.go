@@ -14,17 +14,18 @@ import (
 
 	"github.com/BurntSushi/toml"
 	"github.com/gin-gonic/gin"
-	dbx "github.com/go-ozzo/ozzo-dbx"
 	_ "github.com/lib/pq"
 	"github.com/nicksnyder/go-i18n/v2/i18n"
 	"github.com/uvalib/virgo4-jwt/v4jwt"
 	"golang.org/x/text/language"
+	"gorm.io/driver/postgres"
+	"gorm.io/gorm"
 )
 
 // ServiceContext contains common data used by all handlers
 type ServiceContext struct {
 	Version        string
-	DB             *dbx.DB
+	GDB            *gorm.DB
 	SuggestorURL   string
 	JWTKey         string
 	Solr           SolrConfig
@@ -48,12 +49,11 @@ func InitializeService(version string, cfg *ServiceConfig) *ServiceContext {
 	log.Printf("Connect to Postgres")
 	connStr := fmt.Sprintf("user=%s password=%s dbname=%s host=%s port=%d sslmode=disable",
 		cfg.DBUser, cfg.DBPass, cfg.DBName, cfg.DBHost, cfg.DBPort)
-	db, err := dbx.Open("postgres", connStr)
+	gdb, err := gorm.Open(postgres.Open(connStr), &gorm.Config{})
 	if err != nil {
 		log.Fatal(err)
 	}
-	db.LogFunc = log.Printf
-	svc.DB = db
+	svc.GDB = gdb
 
 	log.Printf("Init localization")
 	svc.I18NBundle = i18n.NewBundle(language.English)
@@ -117,12 +117,11 @@ func (svc *ServiceContext) HealthCheck(c *gin.Context) {
 	}
 	hcMap := make(map[string]hcResp)
 
-	tq := svc.DB.NewQuery("select count(*) as total from sources")
-	var total int
-	err := tq.Row(&total)
-	if err != nil {
-		log.Printf("ERROR: Failed response from PSQL healthcheck: %s", err.Error())
-		hcMap["postgres"] = hcResp{Healthy: false, Message: err.Error()}
+	var total int64
+	dbResp := svc.GDB.Table("sources").Count(&total)
+	if dbResp.Error != nil {
+		log.Printf("ERROR: Failed response from PSQL healthcheck: %s", dbResp.Error.Error())
+		hcMap["postgres"] = hcResp{Healthy: false, Message: dbResp.Error.Error()}
 	} else {
 		hcMap["postgres"] = hcResp{Healthy: true}
 	}

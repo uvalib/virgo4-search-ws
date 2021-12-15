@@ -2,15 +2,6 @@ package main
 
 import "github.com/uvalib/virgo4-api/v4api"
 
-// this is a struct that mirrors the V4DB sources table
-type dbPool struct {
-	ID         int    `json:"-" db:"id"`
-	PrivateURL string `json:"-" db:"private_url"`
-	PublicURL  string `json:"-" db:"public_url"`
-	Name       string `json:"-" db:"name"`
-	Sequence   int    `json:"-" db:"sequence"`
-}
-
 // pool is an extension of the API pool which includes private URL
 // and an easy access flag to indicate if the pool is external (like JRML & WorldCat)
 type pool struct {

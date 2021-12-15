@@ -14,6 +14,16 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
+// this is a struct that mirrors the V4DB sources table
+type source struct {
+	ID         int
+	PrivateURL string
+	PublicURL  string
+	Name       string
+	Sequence   int
+	Enabled    bool
+}
+
 // PoolsMiddleware sits after auth but before any other request. It checks for a sources param.
 // If found it looks up all pools in that source set. If not found, the default pool set is looked up.
 // Results placed in the request context for use by later handlers
@@ -68,26 +78,25 @@ func (svc *ServiceContext) GetPoolsRequest(c *gin.Context) {
 	c.JSON(http.StatusOK, out)
 }
 
-// LookupPools fetches a localizes list of current pools the V4DB & pool /identify
+// LookupPools fetches a localized list of current pools from the V4DB & pool /identify
 // Any pools that fail the /identify call will not be included
 func (svc *ServiceContext) lookupPools(language string) ([]*pool, error) {
-	pools := make([]*pool, 0)
-	q := svc.DB.NewQuery(`select * from sources where sequence>0 and enabled=true order by sequence asc`)
-	rows, err := q.Rows()
-	if err != nil {
-		log.Printf("ERROR: Unable to get authoritative pool information: %+v", err)
-		return nil, err
+	var sources []*source
+	log.Printf("INFO: lookup all pools")
+	dbResp := svc.GDB.Debug().Where("sequence > ? and enabled=?", 0, true).Order("sequence asc").Find(&sources)
+	if dbResp.Error != nil {
+		log.Printf("ERROR: Unable to get authoritative pool information: %s", dbResp.Error.Error())
+		return nil, dbResp.Error
 	}
 
 	channel := make(chan *identifyResult)
 	outstandingRequests := 0
-	for rows.Next() {
-		p := dbPool{}
-		rows.ScanStruct(&p)
+	for _, src := range sources {
 		outstandingRequests++
-		go identifyPool(&p, language, channel, svc.FastHTTPClient)
+		go identifyPool(src, language, channel, svc.FastHTTPClient)
 	}
 
+	pools := make([]*pool, 0)
 	for outstandingRequests > 0 {
 		idResp := <-channel
 		if idResp.Error == nil {
@@ -110,17 +119,17 @@ type identifyResult struct {
 }
 
 // Goroutine to do a pool identify and return the results over a channel
-func identifyPool(dbp *dbPool, language string, channel chan *identifyResult, httpClient *http.Client) {
-	URL := fmt.Sprintf("%s/identify", dbp.PrivateURL)
+func identifyPool(dbSrc *source, language string, channel chan *identifyResult, httpClient *http.Client) {
+	URL := fmt.Sprintf("%s/identify", dbSrc.PrivateURL)
 	languages := []string{language}
 	if language != "en-US" {
 		languages = append(languages, "en-US")
 	}
 	start := time.Now()
-	identity := pool{PrivateURL: dbp.PrivateURL, Sequence: dbp.Sequence}
+	identity := pool{PrivateURL: dbSrc.PrivateURL, Sequence: dbSrc.Sequence}
 	identified := false
 	for _, tgtLanguage := range languages {
-		log.Printf("Request identity information from: %s in %s", URL, tgtLanguage)
+		log.Printf("INFO: request %s identity information from %s in %s", dbSrc.Name, URL, tgtLanguage)
 		idRequest, reqErr := http.NewRequest("GET", URL, nil)
 		if reqErr != nil {
 			log.Printf("ERROR: Unable to generate identify request for %s", URL)
@@ -129,20 +138,20 @@ func identifyPool(dbp *dbPool, language string, channel chan *identifyResult, ht
 		idRequest.Header.Set("Accept-Language", tgtLanguage)
 		resp, err := httpClient.Do(idRequest)
 		if err != nil {
-			log.Printf("ERROR: %s /identify failed: %s", dbp.PrivateURL, err.Error())
+			log.Printf("ERROR: %s /identify failed: %s", dbSrc.PrivateURL, err.Error())
 			continue
 		}
 		defer resp.Body.Close()
 		if resp.StatusCode != 200 {
-			log.Printf("ERROR: %s/identify returned bad status code : %d: ", dbp.PrivateURL, resp.StatusCode)
+			log.Printf("ERROR: %s/identify returned bad status code : %d: ", dbSrc.PrivateURL, resp.StatusCode)
 			continue
 		}
 		respTxt, _ := ioutil.ReadAll(resp.Body)
 		err = json.Unmarshal(respTxt, &identity.V4ID)
 		if err == nil {
-			identity.V4ID.ID = dbp.Name
-			identity.PrivateURL = dbp.PrivateURL
-			identity.V4ID.URL = dbp.PublicURL
+			identity.V4ID.ID = dbSrc.Name
+			identity.PrivateURL = dbSrc.PrivateURL
+			identity.V4ID.URL = dbSrc.PublicURL
 			for _, attr := range identity.V4ID.Attributes {
 				if attr.Name == "external_hold" && attr.Supported == true {
 					identity.IsExternal = true
@@ -151,15 +160,15 @@ func identifyPool(dbp *dbPool, language string, channel chan *identifyResult, ht
 			}
 			poolsNS := time.Since(start)
 			identified = true
-			log.Printf("%s identified in %s as %s. Time: %d ms", dbp.Name, tgtLanguage, identity.V4ID.Name, int64(poolsNS/time.Millisecond))
+			log.Printf("%s identified in %s as %s. Time: %d ms", dbSrc.Name, tgtLanguage, identity.V4ID.Name, int64(poolsNS/time.Millisecond))
 			break
 		} else {
-			log.Printf("ERROR: Unable to parse response from %s: %s", dbp.PrivateURL, err.Error())
+			log.Printf("ERROR: Unable to parse response from %s: %s", dbSrc.PrivateURL, err.Error())
 		}
 	}
 
 	if identified == false {
-		errStr := fmt.Sprintf("Unable to identify %s:%s", dbp.Name, dbp.PrivateURL)
+		errStr := fmt.Sprintf("Unable to identify %s:%s", dbSrc.Name, dbSrc.PrivateURL)
 		channel <- &identifyResult{Pool: nil, Error: errors.New(errStr)}
 	} else {
 		channel <- &identifyResult{Pool: &identity, Error: nil}
