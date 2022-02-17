@@ -155,7 +155,15 @@ func (svc *ServiceContext) searchPool(pool *pool, req clientSearchRequest, heade
 	// only send filter group applicable to this pool (if any)
 	poolReq := req
 	poolReq.Filters = []v4api.Filter{}
+
+	log.Printf("INFO: lookup starting sort order for %s", pool.V4ID.ID)
 	poolReq.Sort = v4api.SortOrder{SortID: "SortRelevance", Order: "desc"}
+	for _, s := range req.PoolSort {
+		if s.PoolID == pool.V4ID.ID {
+			log.Printf("INFO: pool %s starting sort: %+v", pool.V4ID.ID, s.Sort)
+			poolReq.Sort = s.Sort
+		}
+	}
 
 	for _, filterGroup := range req.Filters {
 		if filterGroup.PoolID == pool.V4ID.ID {

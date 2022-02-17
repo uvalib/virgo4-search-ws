@@ -247,7 +247,6 @@ func serviceRequest(verb string, url string, body []byte, headers map[string]str
 	log.Printf("%s %s: %s timeout %.0f", verb, url, body, httpClient.Timeout.Seconds())
 	var postReq *http.Request
 	if verb == "POST" {
-		log.Printf("request has a body")
 		postReq, _ = http.NewRequest(verb, url, bytes.NewBuffer(body))
 	} else {
 		postReq, _ = http.NewRequest(verb, url, nil)
