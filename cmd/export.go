@@ -191,7 +191,6 @@ func (svc *ServiceContext) GeneratePDF(c *gin.Context) {
 		pdf.SetFont("osb", "", 10)
 		yPos = renderLine(&pdf, 20, yPos, strings.Join(item.Title, "; "), "osb", 10)
 		yPos = renderLine(&pdf, 30, yPos, strings.Join(item.Author, "; "), "osr", 10)
-		// yPos = renderLine(&pdf, 30, yPos, strings.Join(item.Library, "; "), "osr", 10)
 		yPos = renderLine(&pdf, 30, yPos, strings.Join(item.Location, "; "), "osr", 10)
 		yPos = renderLine(&pdf, 30, yPos, strings.Join(item.CallNumber, "; "), "osr", 10)
 		yPos += 10
@@ -215,6 +214,10 @@ func renderLine(pdf *gopdf.GoPdf, xPos int, yPos int, line string, fontName stri
 		testLine += word
 		lineW, _ := pdf.MeasureTextWidth(testLine)
 		if lineW >= 550 {
+			if yPos+(fontSize+6)+20 > int(gopdf.PageSizeA4.H) {
+				pdf.AddPage()
+				yPos = 20
+			}
 			pdf.SetY(float64(yPos))
 			pdf.SetX(float64(xPos))
 			pdf.Cell(nil, line)
@@ -225,6 +228,10 @@ func renderLine(pdf *gopdf.GoPdf, xPos int, yPos int, line string, fontName stri
 		}
 	}
 	if line != "" {
+		if yPos+(fontSize+6)+20 > int(gopdf.PageSizeA4.H) {
+			pdf.AddPage()
+			yPos = 20
+		}
 		pdf.SetY(float64(yPos))
 		pdf.SetX(float64(xPos))
 		pdf.Cell(nil, line)
