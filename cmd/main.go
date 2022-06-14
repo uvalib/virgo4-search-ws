@@ -14,7 +14,7 @@ import (
 )
 
 // Version of the service
-const version = "1.3.0"
+const version = "1.4.0"
 
 /**
  * MAIN
@@ -52,7 +52,7 @@ func main() {
 	router.GET("/healthcheck", svc.HealthCheck)
 	api := router.Group("/api")
 	{
-		api.POST("/csv", svc.AuthMiddleware, svc.PoolsMiddleware, svc.GenerateCSV)
+		api.POST("/export", svc.AuthMiddleware, svc.PoolsMiddleware, svc.ExportBookmarks)
 		api.POST("/pdf", svc.AuthMiddleware, svc.PoolsMiddleware, svc.GeneratePDF)
 		api.GET("/pools", svc.PoolsMiddleware, svc.GetPoolsRequest)
 		api.POST("/search", svc.AuthMiddleware, svc.PoolsMiddleware, svc.Search)

@@ -1,17 +1,18 @@
 package main
 
 import (
-	"encoding/csv"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"log"
 	"net/http"
+	"os"
 	"strings"
 	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/signintech/gopdf"
+	"github.com/xuri/excelize/v2"
 )
 
 type requestItem struct {
@@ -39,9 +40,9 @@ type itemDetail struct {
 	ElapsedMS  int64
 }
 
-// GenerateCSV accepts a list of objects containg pool and identifer as POST data
-// It will generate CSV containing details about the items
-func (svc *ServiceContext) GenerateCSV(c *gin.Context) {
+// ExportBookmarks accepts a list of objects containg pool and identifer as POST data
+// It will generate and Excel spreadsheet containing details about the items
+func (svc *ServiceContext) ExportBookmarks(c *gin.Context) {
 	var req exportRequest
 	if err := c.BindJSON(&req); err != nil {
 		log.Printf("ERROR: Unable to parse CSV request: %s", err.Error())
@@ -66,29 +67,92 @@ func (svc *ServiceContext) GenerateCSV(c *gin.Context) {
 		c.String(http.StatusNotFound, "Unable to find item details")
 		return
 	}
-	log.Printf("SUCCESS: All item details for CSV receieved in %dms", elapsedMS)
-	c.Header("Content-Type", "text/csv")
-	cw := csv.NewWriter(c.Writer)
-	csvHead := []string{"title", "author", "library", "location", "call number", "format", "date", "url"}
-	cw.Write(csvHead)
-	baseURL := req.Notes
-	for _, item := range details {
-		url := fmt.Sprintf("%s/sources/%s/items/%s", baseURL, item.Pool, item.Identifier)
-		line := []string{
-			strings.Join(item.Title, "; "),
-			strings.Join(item.Author, "; "),
-			strings.Join(item.Library, "; "),
-			strings.Join(item.Location, "; "),
-			strings.Join(item.CallNumber, "; "),
-			strings.Join(item.Format, "; "),
-			item.Date,
-			url,
-		}
-		cw.Write(line)
-	}
 
-	cw.Flush()
+	log.Printf("SUCCESS: All item details for CSV receieved in %dms", elapsedMS)
+	xf := excelize.NewFile()
+	bm := xf.NewSheet("Bookmarks")
+	xf.SetCellValue("Bookmarks", "A1", "Title")
+	xf.SetCellValue("Bookmarks", "B1", "Author")
+	xf.SetCellValue("Bookmarks", "C1", "Library")
+	xf.SetCellValue("Bookmarks", "D1", "Location")
+	xf.SetCellValue("Bookmarks", "E1", "Call Number")
+	xf.SetCellValue("Bookmarks", "F1", "Format")
+	xf.SetCellValue("Bookmarks", "G1", "Date")
+	xf.SetCellValue("Bookmarks", "H1", "URL")
+
+	baseURL := req.Notes
+	for idx, item := range details {
+		url := fmt.Sprintf("%s/sources/%s/items/%s", baseURL, item.Pool, item.Identifier)
+		xf.SetCellValue("Bookmarks", fmt.Sprintf("A%d", (idx+2)), strings.Join(item.Title, "; "))
+		xf.SetCellValue("Bookmarks", fmt.Sprintf("B%d", (idx+2)), strings.Join(item.Author, "; "))
+		xf.SetCellValue("Bookmarks", fmt.Sprintf("C%d", (idx+2)), strings.Join(item.Library, "; "))
+		xf.SetCellValue("Bookmarks", fmt.Sprintf("D%d", (idx+2)), strings.Join(item.Location, "; "))
+		xf.SetCellValue("Bookmarks", fmt.Sprintf("E%d", (idx+2)), strings.Join(item.CallNumber, "; "))
+		xf.SetCellValue("Bookmarks", fmt.Sprintf("F%d", (idx+2)), strings.Join(item.Format, "; "))
+		xf.SetCellValue("Bookmarks", fmt.Sprintf("G%d", (idx+2)), item.Date)
+		xf.SetCellValue("Bookmarks", fmt.Sprintf("H%d", (idx+2)), url)
+	}
+	xf.SetActiveSheet(bm)
+	fileName := fmt.Sprintf("/tmp/v4-bookmark-export-%d.xlsx", start.Unix())
+	log.Printf("INFO: write excel bookmarks export to %s", fileName)
+	if err := xf.SaveAs(fileName); err != nil {
+		fmt.Println(err)
+	}
+	c.Header("Content-Type", "application/vnd.ms-excel")
+	c.File(fileName)
+	os.Remove(fileName)
 }
+
+// // GenerateCSV accepts a list of objects containg pool and identifer as POST data
+// // It will generate CSV containing details about the items
+// func (svc *ServiceContext) GenerateCSV(c *gin.Context) {
+// 	var req exportRequest
+// 	if err := c.BindJSON(&req); err != nil {
+// 		log.Printf("ERROR: Unable to parse CSV request: %s", err.Error())
+// 		c.String(http.StatusBadRequest, "Invalid CSV request")
+// 		return
+// 	}
+
+// 	// Notes is used to pass in the base URL of the request. Need
+// 	// it to generate the full item details URL
+// 	if req.Notes == "" {
+// 		log.Printf("ERROR: Missing required notes field")
+// 		c.String(http.StatusBadRequest, "Invalid CSV request")
+// 		return
+// 	}
+
+// 	start := time.Now()
+// 	details, err := svc.lookupItems(c, req.Items)
+// 	elapsed := time.Since(start)
+// 	elapsedMS := int64(elapsed / time.Millisecond)
+// 	if err != nil {
+// 		log.Printf("ERROR: Unable to get CSV item details: %s", err.Error())
+// 		c.String(http.StatusNotFound, "Unable to find item details")
+// 		return
+// 	}
+// 	log.Printf("SUCCESS: All item details for CSV receieved in %dms", elapsedMS)
+// 	c.Header("Content-Type", "text/csv")
+// 	cw := csv.NewWriter(c.Writer)
+// 	csvHead := []string{"title", "author", "library", "location", "call number", "format", "date", "url"}
+// 	cw.Write(csvHead)
+// 	baseURL := req.Notes
+// 	for _, item := range details {
+// 		url := fmt.Sprintf("%s/sources/%s/items/%s", baseURL, item.Pool, item.Identifier)
+// 		line := []string{
+// 			strings.Join(item.Title, "; "),
+// 			strings.Join(item.Author, "; "),
+// 			strings.Join(item.Library, "; "),
+// 			strings.Join(item.Location, "; "),
+// 			strings.Join(item.CallNumber, "; "),
+// 			strings.Join(item.Format, "; "),
+// 			item.Date,
+// 			url,
+// 		}
+// 		cw.Write(line)
+// 	}
+
+// 	cw.Flush()
+// }
 
 func (svc *ServiceContext) lookupItems(c *gin.Context, items []requestItem) ([]*itemDetail, error) {
 	// Pools have already been placed in request context by poolsMiddleware. Get them or fail
