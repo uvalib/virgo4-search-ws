@@ -84,16 +84,18 @@ func (svc *ServiceContext) Search(c *gin.Context) {
 			contentLanguage = poolResponse.ContentLanguage
 			log.Printf("Set response Content-Language to %s", contentLanguage)
 		}
-		log.Printf("Pool %s has %d hits and status %d[%s]", poolResponse.ServiceURL,
+		log.Printf("Pool %s has %d hits and status %d [%s]", poolResponse.ServiceURL,
 			poolResponse.Pagination.Total, poolResponse.StatusCode, poolResponse.StatusMessage)
 		if poolResponse.StatusCode == http.StatusOK {
 			out.TotalHits += poolResponse.Pagination.Total
 		} else {
 			logLevel := "ERROR"
-			// we want to log "not implemented" differently as they are "expected" in some cases
-			// (some pools do not support some query types, etc)
-			// this ensures the log filters pick up real errors
-			if poolResponse.StatusCode == http.StatusNotImplemented {
+			// We want to log "not implemented" differently as they are "expected" in some cases
+			// (some pools do not support some query types, etc.)
+			// This ensures the log filters pick up real errors
+			// Also pool timeouts are considered warnings cos we are adding a special filter
+			// to track them independently
+			if poolResponse.StatusCode == http.StatusNotImplemented || poolResponse.StatusCode == http.StatusRequestTimeout {
 				logLevel = "WARNING"
 			}
 			log.Printf("%s: %s returned %d:%s", logLevel, poolResponse.ServiceURL,
