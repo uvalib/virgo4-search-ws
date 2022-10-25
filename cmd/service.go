@@ -264,10 +264,12 @@ func serviceRequest(verb string, url string, body []byte, headers map[string]str
 	resp := timedResponse{ElapsedMS: elapsedMS}
 	if err != nil {
 		logLevel := "ERROR"
-		// we want to log "not implemented" differently as they are "expected" in some cases
-		// (some pools do not support some query types, etc)
-		// this ensures the log filters pick up real errors
-		if err.StatusCode == http.StatusNotImplemented {
+		// We want to log "not implemented" differently as they are "expected" in some cases
+		// (some pools do not support some query types, etc.)
+		// This ensures the log filters pick up real errors
+		// Also pool timeouts are considered warnings cos we are adding a special filter
+		// to track them independently
+		if err.StatusCode == http.StatusNotImplemented || err.StatusCode == http.StatusRequestTimeout {
 			logLevel = "WARNING"
 		}
 		log.Printf("%s: Failed response from POST %s - %d:%s. Elapsed Time: %d (ms)",
