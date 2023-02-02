@@ -70,7 +70,13 @@ func (svc *ServiceContext) ExportBookmarks(c *gin.Context) {
 
 	log.Printf("SUCCESS: All item details for CSV receieved in %dms", elapsedMS)
 	xf := excelize.NewFile()
-	bm := xf.NewSheet("Bookmarks")
+	bm, err := xf.NewSheet("Bookmarks")
+	if err != nil {
+		log.Printf("ERROR: Unable to create new bookmark spreadsheet %s", err.Error())
+		c.String(http.StatusInternalServerError, "Unable create new bookmark spreadsheet")
+		return
+	}
+
 	xf.SetCellValue("Bookmarks", "A1", "Title")
 	xf.SetCellValue("Bookmarks", "B1", "Author")
 	xf.SetCellValue("Bookmarks", "C1", "Library")
