@@ -3,7 +3,7 @@ package main
 import (
 	"bytes"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"log"
 	"net"
 	"net/http"
@@ -193,10 +193,9 @@ func (svc *ServiceContext) AdminMiddleware(c *gin.Context) {
 }
 
 type timedResponse struct {
-	StatusCode      int
-	ContentLanguage string
-	Response        []byte
-	ElapsedMS       int64
+	StatusCode int
+	Response   []byte
+	ElapsedMS  int64
 }
 
 func serviceRequest(verb string, url string, body []byte, headers map[string]string, httpClient *http.Client) timedResponse {
@@ -261,13 +260,13 @@ func handleAPIResponse(logURL string, resp *http.Response, err error) ([]byte, *
 		return nil, &RequestError{StatusCode: status, Message: errMsg}
 	} else if resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusCreated {
 		defer resp.Body.Close()
-		bodyBytes, _ := ioutil.ReadAll(resp.Body)
+		bodyBytes, _ := io.ReadAll(resp.Body)
 		status := resp.StatusCode
 		errMsg := string(bodyBytes)
 		return nil, &RequestError{StatusCode: status, Message: errMsg}
 	}
 
 	defer resp.Body.Close()
-	bodyBytes, _ := ioutil.ReadAll(resp.Body)
+	bodyBytes, _ := io.ReadAll(resp.Body)
 	return bodyBytes, nil
 }

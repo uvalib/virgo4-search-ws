@@ -188,7 +188,6 @@ func (svc *ServiceContext) searchPool(pool *pool, req clientSearchRequest, heade
 	// If we are this far, there is a valid response. Add language
 	results.StatusCode = http.StatusOK
 	results.ElapsedMS = postResp.ElapsedMS
-	results.ContentLanguage = postResp.ContentLanguage
 
 	channel <- results
 }
