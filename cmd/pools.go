@@ -53,8 +53,7 @@ func getPoolsFromContext(c *gin.Context) []*pool {
 	return poolsIface.([]*pool)
 }
 
-// GetPoolsRequest gets a list of all active pools and returns it as JSON. This includes
-// descriptive information localized to match the Accept-Language header. Fallback is en-US
+// GetPoolsRequest gets a list of all active pools and returns it as JSON
 func (svc *ServiceContext) GetPoolsRequest(c *gin.Context) {
 	pools := getPoolsFromContext(c)
 	out := make([]*poolResponse, 0)

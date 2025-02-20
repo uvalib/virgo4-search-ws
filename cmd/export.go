@@ -167,15 +167,9 @@ func (svc *ServiceContext) lookupItems(c *gin.Context, items []requestItem) ([]*
 		return nil, errors.New("No pools found")
 	}
 
-	acceptLang := c.GetHeader("Accept-Language")
-	if acceptLang == "" {
-		acceptLang = "en-US"
-	}
-
 	headers := map[string]string{
-		"Content-Type":    "application/json",
-		"Accept-Language": acceptLang,
-		"Authorization":   c.GetHeader("Authorization"),
+		"Content-Type":  "application/json",
+		"Authorization": c.GetHeader("Authorization"),
 	}
 
 	// Kick off all pool requests in parallel and wait for all to respond
