@@ -2,7 +2,6 @@ package main
 
 import (
 	"bytes"
-	"encoding/json"
 	"fmt"
 	"io/ioutil"
 	"log"
@@ -198,39 +197,6 @@ type timedResponse struct {
 	ContentLanguage string
 	Response        []byte
 	ElapsedMS       int64
-}
-
-func (svc *ServiceContext) solrPost(query string, jsonReq interface{}) ([]byte, *RequestError) {
-	url := fmt.Sprintf("%s/%s/%s", svc.Solr.URL, svc.Solr.Core, query)
-
-	jsonBytes, jsonErr := json.Marshal(jsonReq)
-	if jsonErr != nil {
-		resp, err := handleAPIResponse(url, nil, jsonErr)
-		return resp, err
-	}
-
-	req, reqErr := http.NewRequest("POST", url, bytes.NewBuffer(jsonBytes))
-	if reqErr != nil {
-		resp, err := handleAPIResponse(url, nil, reqErr)
-		return resp, err
-	}
-
-	req.Header.Set("Content-Type", "application/json")
-
-	log.Printf("Solr POST request: %s", url)
-	startTime := time.Now()
-	rawResp, rawErr := svc.SlowHTTPClient.Do(req)
-	resp, err := handleAPIResponse(url, rawResp, rawErr)
-	elapsedNanoSec := time.Since(startTime)
-	elapsedMS := int64(elapsedNanoSec / time.Millisecond)
-
-	if err != nil {
-		log.Printf("ERROR: Failed response from Solr POST %s - %d:%s. Elapsed Time: %d (ms)",
-			url, err.StatusCode, err.Message, elapsedMS)
-	} else {
-		log.Printf("Successful response from Solr POST %s. Elapsed Time: %d (ms)", url, elapsedMS)
-	}
-	return resp, err
 }
 
 func serviceRequest(verb string, url string, body []byte, headers map[string]string, httpClient *http.Client) timedResponse {
