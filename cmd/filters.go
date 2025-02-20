@@ -47,10 +47,7 @@ func (f *filterCache) monitorFilters() {
 
 func (f *filterCache) refreshCache() {
 	log.Printf("[FILTERS] refreshing filters...")
-
-	acceptLang := "en-US"
-
-	pools, err := f.svc.lookupPools(acceptLang)
+	pools, err := f.svc.lookupPools()
 	if err != nil {
 		log.Printf("[FILTERS] ERROR: Unable to get default pools: %+v", err)
 		return
@@ -74,7 +71,7 @@ func (f *filterCache) refreshCache() {
 			if pool.V4ID.Source == source {
 				log.Printf("[FILTERS] source [%s] will query pool [%s]", source, pool.V4ID.ID)
 				outstandingRequests++
-				go f.getPoolFilters(pool, acceptLang, channel, f.svc.SlowHTTPClient)
+				go f.getPoolFilters(pool, channel, f.svc.SlowHTTPClient)
 				break
 			}
 		}
@@ -213,7 +210,7 @@ func (svc *ServiceContext) GetSearchFilters(c *gin.Context) {
 }
 
 // Goroutine to do a pool pre-search filter lookup and return the results over a channel
-func (f *filterCache) getPoolFilters(pool *pool, language string, channel chan *filterResponse, httpClient *http.Client) {
+func (f *filterCache) getPoolFilters(pool *pool, channel chan *filterResponse, httpClient *http.Client) {
 	var method string
 	var endpoint string
 	var v4query []byte
@@ -231,8 +228,7 @@ func (f *filterCache) getPoolFilters(pool *pool, language string, channel chan *
 	}
 
 	headers := map[string]string{
-		"Accept-Language": language,
-		"Authorization":   fmt.Sprintf("Bearer %s", token),
+		"Authorization": fmt.Sprintf("Bearer %s", token),
 	}
 
 	switch {

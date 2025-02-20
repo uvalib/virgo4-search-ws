@@ -63,14 +63,10 @@ func (svc *ServiceContext) Search(c *gin.Context) {
 	}
 
 	// wait for all to be done and get respnses as they come in
-	var contentLanguage string
 	for outstandingRequests > 0 {
 		poolResponse := <-channel
 		out.Results = append(out.Results, poolResponse)
-		if contentLanguage == "" {
-			contentLanguage = poolResponse.ContentLanguage
-			log.Printf("Set response Content-Language to %s", contentLanguage)
-		}
+
 		log.Printf("Pool %s has %d hits and status %d [%s]", poolResponse.ServiceURL,
 			poolResponse.Pagination.Total, poolResponse.StatusCode, poolResponse.StatusMessage)
 		if poolResponse.StatusCode == http.StatusOK {
@@ -105,7 +101,6 @@ func (svc *ServiceContext) Search(c *gin.Context) {
 	out.TotalTimeMS = elapsedMS
 
 	log.Printf("Received all pool responses. Elapsed Time: %d (ms)", elapsedMS)
-	c.Header("Content-Language", contentLanguage)
 	c.JSON(http.StatusOK, out)
 }
 

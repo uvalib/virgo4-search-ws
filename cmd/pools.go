@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"io/ioutil"
 	"log"
 	"net/http"
@@ -28,14 +29,9 @@ type source struct {
 // If found it looks up all pools in that source set. If not found, the default pool set is looked up.
 // Results placed in the request context for use by later handlers
 func (svc *ServiceContext) PoolsMiddleware(c *gin.Context) {
-	acceptLang := c.GetHeader("Accept-Language")
-	if acceptLang == "" {
-		acceptLang = "en-US"
-	}
-
 	log.Printf("Pools Middleware: get pools")
 	start := time.Now()
-	pools, err := svc.lookupPools(acceptLang)
+	pools, err := svc.lookupPools()
 	if err != nil {
 		log.Printf("ERROR: Unable to get pools: %+v", err)
 		c.AbortWithStatus(http.StatusNotFound)
@@ -78,9 +74,9 @@ func (svc *ServiceContext) GetPoolsRequest(c *gin.Context) {
 	c.JSON(http.StatusOK, out)
 }
 
-// LookupPools fetches a localized list of current pools from the V4DB & pool /identify
+// LookupPools fetches a list of current pools from the V4DB & pool /identify
 // Any pools that fail the /identify call will not be included
-func (svc *ServiceContext) lookupPools(language string) ([]*pool, error) {
+func (svc *ServiceContext) lookupPools() ([]*pool, error) {
 	var sources []*source
 	log.Printf("INFO: lookup all pools")
 	dbResp := svc.GDB.Debug().Where("sequence > ? and enabled=?", 0, true).Order("sequence asc").Find(&sources)
@@ -93,7 +89,7 @@ func (svc *ServiceContext) lookupPools(language string) ([]*pool, error) {
 	outstandingRequests := 0
 	for _, src := range sources {
 		outstandingRequests++
-		go identifyPool(src, language, channel, svc.FastHTTPClient)
+		go identifyPool(src, channel, svc.FastHTTPClient)
 	}
 
 	pools := make([]*pool, 0)
@@ -119,60 +115,51 @@ type identifyResult struct {
 }
 
 // Goroutine to do a pool identify and return the results over a channel
-func identifyPool(dbSrc *source, language string, channel chan *identifyResult, httpClient *http.Client) {
+func identifyPool(dbSrc *source, channel chan *identifyResult, httpClient *http.Client) {
 	URL := fmt.Sprintf("%s/identify", dbSrc.PrivateURL)
-	languages := []string{language}
-	if language != "en-US" {
-		languages = append(languages, "en-US")
-	}
 	start := time.Now()
 	identity := pool{PrivateURL: dbSrc.PrivateURL, Sequence: dbSrc.Sequence}
-	identified := false
-	for _, tgtLanguage := range languages {
-		log.Printf("INFO: request %s identity information from %s in %s", dbSrc.Name, URL, tgtLanguage)
-		idRequest, reqErr := http.NewRequest("GET", URL, nil)
-		if reqErr != nil {
-			log.Printf("ERROR: Unable to generate identify request for %s", URL)
-			continue
-		}
-		idRequest.Header.Set("Accept-Language", tgtLanguage)
-		resp, err := httpClient.Do(idRequest)
-		if err != nil {
-			log.Printf("ERROR: %s /identify failed: %s", dbSrc.PrivateURL, err.Error())
-			continue
-		}
-		defer resp.Body.Close()
-		if resp.StatusCode != 200 {
-			log.Printf("ERROR: %s/identify returned bad status code : %d: ", dbSrc.PrivateURL, resp.StatusCode)
-			continue
-		}
-		respTxt, _ := ioutil.ReadAll(resp.Body)
-		err = json.Unmarshal(respTxt, &identity.V4ID)
-		if err == nil {
-			identity.V4ID.ID = dbSrc.Name
-			identity.PrivateURL = dbSrc.PrivateURL
-			identity.V4ID.URL = dbSrc.PublicURL
-			for _, attr := range identity.V4ID.Attributes {
-				if attr.Name == "external_hold" && attr.Supported == true {
-					identity.IsExternal = true
-					break
-				}
-			}
-			poolsNS := time.Since(start)
-			identified = true
-			log.Printf("%s identified in %s as %s. Time: %d ms", dbSrc.Name, tgtLanguage, identity.V4ID.Name, int64(poolsNS/time.Millisecond))
-			break
-		} else {
-			log.Printf("ERROR: Unable to parse response from %s: %s", dbSrc.PrivateURL, err.Error())
-		}
+
+	log.Printf("INFO: request %s identity information from %s", dbSrc.Name, URL)
+	idRequest, reqErr := http.NewRequest("GET", URL, nil)
+	if reqErr != nil {
+		log.Printf("ERROR: Unable to generate identify request for %s", URL)
+		channel <- &identifyResult{Pool: nil, Error: fmt.Errorf("Unable to identify %s:%s", dbSrc.Name, dbSrc.PrivateURL)}
+		return
+	}
+	resp, err := httpClient.Do(idRequest)
+	if err != nil {
+		log.Printf("ERROR: %s /identify failed: %s", dbSrc.PrivateURL, err.Error())
+		channel <- &identifyResult{Pool: nil, Error: fmt.Errorf("Unable to identify %s:%s", dbSrc.Name, dbSrc.PrivateURL)}
+		return
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != 200 {
+		log.Printf("ERROR: %s/identify returned bad status code : %d: ", dbSrc.PrivateURL, resp.StatusCode)
+		channel <- &identifyResult{Pool: nil, Error: fmt.Errorf("Unable to identify %s:%s", dbSrc.Name, dbSrc.PrivateURL)}
+		return
 	}
 
-	if identified == false {
-		errStr := fmt.Sprintf("Unable to identify %s:%s", dbSrc.Name, dbSrc.PrivateURL)
-		channel <- &identifyResult{Pool: nil, Error: errors.New(errStr)}
-	} else {
-		channel <- &identifyResult{Pool: &identity, Error: nil}
+	respTxt, _ := io.ReadAll(resp.Body)
+	err = json.Unmarshal(respTxt, &identity.V4ID)
+	if err != nil {
+		log.Printf("ERROR: Unable to parse response from %s: %s", dbSrc.PrivateURL, err.Error())
+		channel <- &identifyResult{Pool: nil, Error: fmt.Errorf("Unable to identify %s:%s", dbSrc.Name, dbSrc.PrivateURL)}
+		return
 	}
+
+	identity.V4ID.ID = dbSrc.Name
+	identity.PrivateURL = dbSrc.PrivateURL
+	identity.V4ID.URL = dbSrc.PublicURL
+	for _, attr := range identity.V4ID.Attributes {
+		if attr.Name == "external_hold" && attr.Supported == true {
+			identity.IsExternal = true
+			break
+		}
+	}
+	poolsNS := time.Since(start)
+	log.Printf("%s identified as %s. Time: %d ms", dbSrc.Name, identity.V4ID.Name, int64(poolsNS/time.Millisecond))
+	channel <- &identifyResult{Pool: &identity, Error: nil}
 }
 
 // Goroutine to get pool providers, append them to pool data and return result
