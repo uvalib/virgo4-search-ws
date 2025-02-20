@@ -5,13 +5,11 @@ go 1.22
 toolchain go1.23.4
 
 require (
-	github.com/BurntSushi/toml v1.4.0
 	github.com/gin-contrib/cors v1.7.3
 	github.com/gin-contrib/gzip v1.2.2
 	github.com/gin-contrib/pprof v1.5.2
 	github.com/gin-gonic/gin v1.10.0
 	github.com/lib/pq v1.10.9
-	github.com/nicksnyder/go-i18n/v2 v2.5.1
 	github.com/prometheus/client_golang v1.21.0
 	github.com/signintech/gopdf v0.29.2
 	github.com/uvalib/virgo4-api v0.0.0-20241126213111-b647424688f9
@@ -19,7 +17,6 @@ require (
 	github.com/uvalib/virgo4-parser v0.0.0-20220606190657-5119d778d14a
 	github.com/xuri/excelize/v2 v2.9.0
 	github.com/zsais/go-gin-prometheus v0.1.0
-	golang.org/x/text v0.22.0
 	gorm.io/driver/postgres v1.5.11
 	gorm.io/gorm v1.25.12
 )
@@ -72,6 +69,7 @@ require (
 	golang.org/x/net v0.35.0 // indirect
 	golang.org/x/sync v0.11.0 // indirect
 	golang.org/x/sys v0.30.0 // indirect
+	golang.org/x/text v0.22.0 // indirect
 	google.golang.org/protobuf v1.36.5 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 )

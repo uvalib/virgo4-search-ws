@@ -12,12 +12,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/BurntSushi/toml"
 	"github.com/gin-gonic/gin"
 	_ "github.com/lib/pq"
-	"github.com/nicksnyder/go-i18n/v2/i18n"
 	"github.com/uvalib/virgo4-jwt/v4jwt"
-	"golang.org/x/text/language"
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
 )
@@ -29,7 +26,6 @@ type ServiceContext struct {
 	SuggestorURL   string
 	JWTKey         string
 	Solr           SolrConfig
-	I18NBundle     *i18n.Bundle
 	HTTPClient     *http.Client
 	FastHTTPClient *http.Client
 	SlowHTTPClient *http.Client
@@ -54,12 +50,6 @@ func InitializeService(version string, cfg *ServiceConfig) *ServiceContext {
 		log.Fatal(err)
 	}
 	svc.GDB = gdb
-
-	log.Printf("Init localization")
-	svc.I18NBundle = i18n.NewBundle(language.English)
-	svc.I18NBundle.RegisterUnmarshalFunc("toml", toml.Unmarshal)
-	svc.I18NBundle.MustLoadMessageFile("./i18n/active.en.toml")
-	svc.I18NBundle.MustLoadMessageFile("./i18n/active.es.toml")
 
 	log.Printf("Create HTTP client for external service calls")
 	defaultTransport := &http.Transport{

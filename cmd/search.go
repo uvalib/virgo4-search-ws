@@ -8,8 +8,6 @@ import (
 	"sort"
 	"time"
 
-	"github.com/nicksnyder/go-i18n/v2/i18n"
-
 	"github.com/gin-gonic/gin"
 	"github.com/uvalib/virgo4-api/v4api"
 	"github.com/uvalib/virgo4-parser/v4parser"
@@ -18,27 +16,18 @@ import (
 // Search queries all pools for results, collects and curates results. It will also send the query
 // to the suggestor service and return suggested search terms. Response is JSON
 func (svc *ServiceContext) Search(c *gin.Context) {
-	acceptLang := c.GetHeader("Accept-Language")
-	if acceptLang == "" {
-		acceptLang = "en-US"
-	}
-	localizer := i18n.NewLocalizer(svc.I18NBundle, acceptLang)
-
 	var req clientSearchRequest
 	if jsonErr := c.BindJSON(&req); jsonErr != nil {
 		log.Printf("ERROR: Unable to parse search request: %s", jsonErr.Error())
-		err := searchError{Message: localizer.MustLocalize(&i18n.LocalizeConfig{MessageID: "BadSearch"}),
-			Details: jsonErr.Error()}
+		err := searchError{Message: "This query is malformed or unsupported.", Details: jsonErr.Error()}
 		c.JSON(http.StatusBadRequest, err)
 		return
 	}
-	log.Printf("Search Request %+v with Accept-Language %s", req, acceptLang)
 
 	valid, errors := v4parser.Validate(req.Query)
 	if valid == false {
 		log.Printf("ERROR: Query [%s] is not valid: %s", req.Query, errors)
-		err := searchError{Message: localizer.MustLocalize(&i18n.LocalizeConfig{MessageID: "BadSearch"}),
-			Details: errors}
+		err := searchError{Message: "This query is malformed or unsupported.", Details: errors}
 		c.JSON(http.StatusBadRequest, err)
 		return
 	}
@@ -46,17 +35,15 @@ func (svc *ServiceContext) Search(c *gin.Context) {
 	// Pools have already been placed in request context by poolsMiddleware. Get them or fail
 	pools := getPoolsFromContext(c)
 	if len(pools) == 0 {
-		err := searchError{Message: localizer.MustLocalize(&i18n.LocalizeConfig{MessageID: "NoPools"}),
-			Details: errors}
+		err := searchError{Message: "All resourcess are surrently offline. Please try again later.", Details: errors}
 		c.JSON(http.StatusInternalServerError, err)
 		return
 	}
 
 	// headers to send to pool
 	headers := map[string]string{
-		"Content-Type":    "application/json",
-		"Accept-Language": acceptLang,
-		"Authorization":   c.GetHeader("Authorization"),
+		"Content-Type":  "application/json",
+		"Authorization": c.GetHeader("Authorization"),
 	}
 
 	// kick off a request to get suggestions based on search query
