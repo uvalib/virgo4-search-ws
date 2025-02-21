@@ -12,7 +12,7 @@ require (
 	github.com/lib/pq v1.10.9
 	github.com/prometheus/client_golang v1.21.0
 	github.com/signintech/gopdf v0.29.2
-	github.com/uvalib/virgo4-api v0.0.0-20241126213111-b647424688f9
+	github.com/uvalib/virgo4-api v1.0.0
 	github.com/uvalib/virgo4-jwt v1.2.1
 	github.com/uvalib/virgo4-parser v0.0.0-20220606190657-5119d778d14a
 	github.com/xuri/excelize/v2 v2.9.0
