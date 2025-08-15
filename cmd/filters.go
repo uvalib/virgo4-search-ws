@@ -17,19 +17,22 @@ import (
 type filterResponse struct {
 	pool    *pool
 	filters *v4api.PoolFacets
+	updated time.Time
 }
 
 type filterCache struct {
 	svc             *ServiceContext
 	refreshInterval int
-	currentFilters  []v4api.QueryFilter
+	sourceFilters   map[string]*filterResponse
+	combinedFilters []v4api.QueryFilter
 }
 
 func newFilterCache(svc *ServiceContext, interval int) *filterCache {
 	cache := filterCache{
 		svc:             svc,
 		refreshInterval: interval,
-		currentFilters:  []v4api.QueryFilter{},
+		sourceFilters:   make(map[string]*filterResponse),
+		combinedFilters: []v4api.QueryFilter{},
 	}
 
 	go cache.monitorFilters()
@@ -61,8 +64,6 @@ func (f *filterCache) refreshCache() {
 	// filter IDs, and b) only the solr pools currently specify bucket sort order.
 	sources := []string{"solr", "solr-images", "eds"}
 
-	filterResps := make(map[string]*filterResponse)
-
 	channel := make(chan *filterResponse)
 	outstandingRequests := 0
 
@@ -80,15 +81,9 @@ func (f *filterCache) refreshCache() {
 	for outstandingRequests > 0 {
 		filterResp := <-channel
 		if filterResp.filters != nil {
-			filterResps[filterResp.pool.V4ID.Source] = filterResp
+			f.sourceFilters[filterResp.pool.V4ID.Source] = filterResp
 		}
 		outstandingRequests--
-	}
-
-	// sanity check: only update if we received as many responses as there are sources
-	if len(filterResps) != len(sources) {
-		log.Printf("[FILTERS] not all sources returned filters; skipping refresh")
-		return
 	}
 
 	// merge filter lists from each representative pool
@@ -103,10 +98,12 @@ func (f *filterCache) refreshCache() {
 
 	// collect source/filter list for each filter ID
 	for _, source := range sources {
-		filterResp := filterResps[source]
+		filterResp := f.sourceFilters[source]
 		if filterResp == nil {
 			continue
 		}
+
+		log.Printf("[FILTERS] source [%s] filters last updated %d seconds ago", source, int(time.Since(filterResp.updated).Seconds()))
 
 		for _, facet := range filterResp.filters.FacetList {
 			log.Printf("[FILTERS] source [%s] provided filter: [%s] (%d values)",
@@ -196,11 +193,11 @@ func (f *filterCache) refreshCache() {
 		combined = append(combined, queryFilter)
 	}
 
-	f.currentFilters = combined
+	f.combinedFilters = combined
 }
 
 func (f *filterCache) getFilters() []v4api.QueryFilter {
-	return f.currentFilters
+	return f.combinedFilters
 }
 
 // GetSearchFilters will return all available advanced search filters
@@ -302,6 +299,7 @@ func (f *filterCache) getPoolFilters(pool *pool, channel chan *filterResponse, h
 	}
 
 	chanResp.filters = &filters
+	chanResp.updated = time.Now()
 
 	channel <- chanResp
 }

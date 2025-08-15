@@ -14,3 +14,4 @@ env.*
 /pkg
 run.sh
 curls.txt
+*.swp
