@@ -48,8 +48,7 @@ func (svc *ServiceContext) Search(c *gin.Context) {
 
 	// kick off a request to get suggestions based on search query
 	sugChannel := make(chan []v4api.Suggestion)
-	sugURL := fmt.Sprintf("%s/api/suggest", svc.SuggestorURL)
-	go svc.getSuggestions(sugURL, req.Query, headers, sugChannel)
+	go svc.getSuggestions(req, headers, sugChannel)
 
 	// Do the search...
 	out := NewSearchResponse(&req)
@@ -104,13 +103,16 @@ func (svc *ServiceContext) Search(c *gin.Context) {
 	c.JSON(http.StatusOK, out)
 }
 
-func (svc *ServiceContext) getSuggestions(url string, query string, headers map[string]string, channel chan []v4api.Suggestion) {
+func (svc *ServiceContext) getSuggestions(req clientSearchRequest, headers map[string]string, channel chan []v4api.Suggestion) {
 	var reqStruct struct {
-		Query string
+		Query    string `json:"query"`
+		AIPrompt string `json:"aiPrompt"`
 	}
-	reqStruct.Query = query
+	sugURL := fmt.Sprintf("%s/api/suggest", svc.SuggestorURL)
+	reqStruct.Query = req.Query
+	reqStruct.AIPrompt = req.Preferences.AIPrompt
 	reqBytes, _ := json.Marshal(reqStruct)
-	resp := serviceRequest("POST", url, reqBytes, headers, svc.HTTPClient)
+	resp := serviceRequest("POST", sugURL, reqBytes, headers, svc.HTTPClient)
 	if resp.StatusCode != http.StatusOK {
 		channel <- make([]v4api.Suggestion, 0)
 		return
