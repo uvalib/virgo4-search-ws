@@ -26,7 +26,7 @@ func (svc *ServiceContext) Search(c *gin.Context) {
 
 	valid, errors := v4parser.Validate(req.Query)
 	if valid == false {
-		log.Printf("ERROR: Query [%s] is not valid: %s", req.Query, errors)
+		log.Printf("INFO: Query [%s] is not valid: %s", req.Query, errors)
 		err := searchError{Message: "This query is malformed or unsupported.", Details: errors}
 		c.JSON(http.StatusBadRequest, err)
 		return
