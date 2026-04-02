@@ -13,7 +13,6 @@ type SolrConfig struct {
 
 // ServiceConfig defines all of the archives transfer service configuration paramaters
 type ServiceConfig struct {
-	SuggestorURL string
 	DBHost       string
 	DBPort       int
 	DBName       string
@@ -35,7 +34,6 @@ func LoadConfiguration() *ServiceConfig {
 	flag.StringVar(&cfg.DBName, "dbname", "virgo4", "Database name")
 	flag.StringVar(&cfg.DBUser, "dbuser", "v4user", "Database user")
 	flag.StringVar(&cfg.DBPass, "dbpass", "pass", "Database password")
-	flag.StringVar(&cfg.SuggestorURL, "suggestor", "", "Suggestor service URL")
 	flag.StringVar(&cfg.JWTKey, "jwtkey", "", "JWT signature key")
 
 	// Solr config
@@ -44,11 +42,6 @@ func LoadConfiguration() *ServiceConfig {
 
 	flag.Parse()
 
-	if cfg.SuggestorURL == "" {
-		log.Fatal("suggestor param is required")
-	} else {
-		log.Printf("Suggestor API endpoint: %s", cfg.SuggestorURL)
-	}
 	if cfg.JWTKey == "" {
 		log.Fatal("jwtkey param is required")
 	}

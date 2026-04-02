@@ -22,7 +22,6 @@ import (
 type ServiceContext struct {
 	Version        string
 	GDB            *gorm.DB
-	SuggestorURL   string
 	JWTKey         string
 	Solr           SolrConfig
 	HTTPClient     *http.Client
@@ -37,9 +36,8 @@ type ServiceContext struct {
 func InitializeService(version string, cfg *ServiceConfig) *ServiceContext {
 	log.Printf("Initializing Service")
 	svc := ServiceContext{Version: version,
-		SuggestorURL: cfg.SuggestorURL,
-		Solr:         cfg.Solr,
-		JWTKey:       cfg.JWTKey}
+		Solr:   cfg.Solr,
+		JWTKey: cfg.JWTKey}
 
 	log.Printf("Connect to Postgres")
 	connStr := fmt.Sprintf("user=%s password=%s dbname=%s host=%s port=%d",
@@ -112,19 +110,7 @@ func (svc *ServiceContext) HealthCheck(c *gin.Context) {
 		log.Printf("ERROR: Failed response from PSQL healthcheck: %s", dbResp.Error.Error())
 		hcMap["postgres"] = hcResp{Healthy: false, Message: dbResp.Error.Error()}
 	} else {
-		hcMap["postgres"] = hcResp{Healthy: true}
-	}
-
-	if svc.SuggestorURL != "" {
-		apiURL := fmt.Sprintf("%s/version", svc.SuggestorURL)
-		resp, err := svc.FastHTTPClient.Get(apiURL)
-		if err != nil {
-			log.Printf("ERROR: Suggestor %s ping failed: %s", svc.SuggestorURL, err.Error())
-			hcMap["suggestor"] = hcResp{Healthy: false, Message: err.Error()}
-		} else {
-			hcMap["suggestor"] = hcResp{Healthy: true}
-			defer resp.Body.Close()
-		}
+	hcMap["postgres"] = hcResp{Healthy: true}
 	}
 
 	c.JSON(http.StatusOK, hcMap)

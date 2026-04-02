@@ -56,7 +56,6 @@ func main() {
 		api.POST("/pdf", svc.AuthMiddleware, svc.PoolsMiddleware, svc.GeneratePDF)
 		api.GET("/pools", svc.PoolsMiddleware, svc.GetPoolsRequest)
 		api.POST("/search", svc.AuthMiddleware, svc.PoolsMiddleware, svc.Search)
-		api.POST("/search/suggestions", svc.AuthMiddleware, svc.SearchSuggestions)
 		api.GET("/filters", svc.AuthMiddleware, svc.PoolsMiddleware, svc.GetSearchFilters)
 	}
 

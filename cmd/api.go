@@ -37,7 +37,6 @@ type MasterResponse struct {
 	TotalHits   int                  `json:"total_hits"`
 	Results     []*v4api.PoolResult  `json:"pool_results"`
 	Warnings    []string             `json:"warnings"`
-	Suggestions []v4api.Suggestion   `json:"suggestions"`
 }
 
 // NewSearchResponse creates a new instance of a search response

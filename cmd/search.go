@@ -13,8 +13,7 @@ import (
 	"github.com/uvalib/virgo4-parser/v4parser"
 )
 
-// Search queries all pools for results, collects and curates results. It will also send the query
-// to the suggestor service and return suggested search terms. Response is JSON
+// Search queries all pools for results, collects and curates results. Response is JSON
 func (svc *ServiceContext) Search(c *gin.Context) {
 	var req clientSearchRequest
 	if jsonErr := c.BindJSON(&req); jsonErr != nil {
@@ -85,7 +84,7 @@ func (svc *ServiceContext) Search(c *gin.Context) {
 		outstandingRequests--
 	}
 
-	out.Suggestions = make([]v4api.Suggestion, 0)
+	// sort pool results by pool sequence
 
 	// sort pool results by pool sequence
 	log.Printf("Sort results by sequence")
@@ -99,56 +98,6 @@ func (svc *ServiceContext) Search(c *gin.Context) {
 
 	log.Printf("Received all pool responses. Elapsed Time: %d (ms)", elapsedMS)
 	c.JSON(http.StatusOK, out)
-}
-
-// SearchSuggestions returns a list of suggested author names based on the query
-func (svc *ServiceContext) SearchSuggestions(c *gin.Context) {
-	var req clientSearchRequest
-	if jsonErr := c.BindJSON(&req); jsonErr != nil {
-		log.Printf("ERROR: Unable to parse suggest request: %s", jsonErr.Error())
-		c.JSON(http.StatusBadRequest, gin.H{"message": "Invalid request"})
-		return
-	}
-
-	headers := map[string]string{
-		"Content-Type":  "application/json",
-		"Authorization": c.GetHeader("Authorization"),
-	}
-
-	sugChannel := make(chan []v4api.Suggestion)
-	go svc.getSuggestions(req, headers, sugChannel)
-	suggestions := <-sugChannel
-
-	c.JSON(http.StatusOK, gin.H{"suggestions": suggestions})
-}
-
-func (svc *ServiceContext) getSuggestions(req clientSearchRequest, headers map[string]string, channel chan []v4api.Suggestion) {
-	var reqStruct struct {
-		Query    string `json:"query"`
-		AIPrompt string `json:"aiPrompt"`
-	}
-	sugURL := fmt.Sprintf("%s/api/suggest", svc.SuggestorURL)
-	reqStruct.Query = req.Query
-	reqStruct.AIPrompt = req.Preferences.AIPrompt
-	reqBytes, _ := json.Marshal(reqStruct)
-	resp := serviceRequest("POST", sugURL, reqBytes, headers, svc.HTTPClient)
-	if resp.StatusCode != http.StatusOK {
-		channel <- make([]v4api.Suggestion, 0)
-		return
-	}
-
-	log.Printf("Raw suggestor response: %s", resp.Response)
-	var respStruct struct {
-		Suggestions []v4api.Suggestion
-	}
-	err := json.Unmarshal(resp.Response, &respStruct)
-	if err != nil {
-		log.Printf("ERROR: Malformed suggestor response: %s", err.Error())
-		channel <- make([]v4api.Suggestion, 0)
-		return
-	}
-
-	channel <- respStruct.Suggestions
 }
 
 // Goroutine to do a pool search and return the PoolResults on the channel
