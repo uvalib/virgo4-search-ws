@@ -66,10 +66,10 @@ func (svc *ServiceContext) Search(c *gin.Context) {
 	channel := make(chan *v4api.PoolResult)
 	outstandingRequests := 0
 	for _, p := range pools {
+		out.Pools = append(out.Pools, p.V4ID)
 		if slices.Contains(exclusions, p.V4ID.ID) {
 			log.Printf("INFO: skipping pool %s because it was excluded by %s", p.V4ID.ID, claims.UserID)
 		} else {
-			out.Pools = append(out.Pools, p.V4ID)
 			outstandingRequests++
 			go svc.searchPool(p, req, headers, channel)
 		}
