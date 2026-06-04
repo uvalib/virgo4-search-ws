@@ -5,11 +5,13 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"slices"
 	"sort"
 	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/uvalib/virgo4-api/v4api"
+	"github.com/uvalib/virgo4-jwt/v4jwt"
 	"github.com/uvalib/virgo4-parser/v4parser"
 )
 
@@ -22,6 +24,8 @@ func (svc *ServiceContext) Search(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, err)
 		return
 	}
+
+	log.Printf("INFO: search request received %+v", req)
 
 	valid, errors := v4parser.Validate(req.Query)
 	if valid == false {
@@ -39,23 +43,36 @@ func (svc *ServiceContext) Search(c *gin.Context) {
 		return
 	}
 
+	// get user clais for logging. Note that this request has already been thru
+	// user middlewere so the claims will exist
+	val, _ := c.Get("claims")
+	claims := val.(*v4jwt.V4Claims)
+
 	// headers to send to pool
 	headers := map[string]string{
 		"Content-Type":  "application/json",
 		"Authorization": c.GetHeader("Authorization"),
 	}
 
-
+	exclusions := req.Preferences.ExcludePools
+	if len(exclusions) > 0 {
+		log.Printf("INFO: the following pools have been excluded by %s: %s", claims.UserID, exclusions)
+	}
 
 	// Do the search...
+	log.Printf("INFO: %s begins search for [%s] with filters %+v", claims.UserID, req.Query, req.Filters)
 	out := NewSearchResponse(&req)
 	start := time.Now()
 	channel := make(chan *v4api.PoolResult)
 	outstandingRequests := 0
 	for _, p := range pools {
-		out.Pools = append(out.Pools, p.V4ID)
-		outstandingRequests++
-		go svc.searchPool(p, req, headers, channel)
+		if slices.Contains(exclusions, p.V4ID.ID) {
+			log.Printf("INFO: skipping pool %s because it was excluded by %s", p.V4ID.ID, claims.UserID)
+		} else {
+			out.Pools = append(out.Pools, p.V4ID)
+			outstandingRequests++
+			go svc.searchPool(p, req, headers, channel)
+		}
 	}
 
 	// wait for all to be done and get respnses as they come in
@@ -63,7 +80,7 @@ func (svc *ServiceContext) Search(c *gin.Context) {
 		poolResponse := <-channel
 		out.Results = append(out.Results, poolResponse)
 
-		log.Printf("Pool %s has %d hits and status %d [%s]", poolResponse.ServiceURL,
+		log.Printf("INFO: pool %s has %d hits and status %d [%s]", poolResponse.ServiceURL,
 			poolResponse.Pagination.Total, poolResponse.StatusCode, poolResponse.StatusMessage)
 		if poolResponse.StatusCode == http.StatusOK {
 			out.TotalHits += poolResponse.Pagination.Total
@@ -87,7 +104,7 @@ func (svc *ServiceContext) Search(c *gin.Context) {
 	// sort pool results by pool sequence
 
 	// sort pool results by pool sequence
-	log.Printf("Sort results by sequence")
+	log.Printf("INFO: sort results by sequence")
 	poolSort := bySequence{results: out.Results, pools: pools}
 	sort.Sort(&poolSort)
 
@@ -96,7 +113,7 @@ func (svc *ServiceContext) Search(c *gin.Context) {
 	elapsedMS := int64(elapsed / time.Millisecond)
 	out.TotalTimeMS = elapsedMS
 
-	log.Printf("Received all pool responses. Elapsed Time: %d (ms)", elapsedMS)
+	log.Printf("INFO: received all pool responses. Elapsed Time: %d (ms)", elapsedMS)
 	c.JSON(http.StatusOK, out)
 }
 
