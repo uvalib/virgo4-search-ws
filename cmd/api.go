@@ -22,9 +22,15 @@ type poolSort struct {
 	Sort   v4api.SortOrder `json:"sort"`
 }
 
+type poolQuery struct {
+	PoolID string `json:"poolID"`
+	Query  string `json:"query"`
+}
+
 type clientSearchRequest struct {
 	v4api.SearchRequest
-	PoolSort []poolSort `json:"pool_sorting"`
+	PoolSort        []poolSort  `json:"pool_sorting"`
+	PoolQueryAddons []poolQuery `json:"pool_query_addons"`
 }
 
 // MasterResponse is the search-ws response to a search request. It is different from the

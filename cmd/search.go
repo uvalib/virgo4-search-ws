@@ -43,7 +43,7 @@ func (svc *ServiceContext) Search(c *gin.Context) {
 		return
 	}
 
-	// get user clais for logging. Note that this request has already been thru
+	// get user claims for logging. Note that this request has already been thru
 	// user middlewere so the claims will exist
 	val, _ := c.Get("claims")
 	claims := val.(*v4jwt.V4Claims)
@@ -145,6 +145,12 @@ func (svc *ServiceContext) searchPool(pool *pool, req clientSearchRequest, heade
 	for _, poolSort := range req.PoolSort {
 		if poolSort.PoolID == pool.V4ID.ID {
 			poolReq.Sort = poolSort.Sort
+			break
+		}
+	}
+	for _, poolQ := range req.PoolQueryAddons {
+		if poolQ.PoolID == pool.V4ID.ID {
+			poolReq.Query += fmt.Sprintf(" AND %s", poolQ.Query)
 			break
 		}
 	}
