@@ -6,15 +6,22 @@ import "github.com/uvalib/virgo4-api/v4api"
 // and an easy access flag to indicate if the pool is external (like JRML & WorldCat)
 type pool struct {
 	V4ID       v4api.PoolIdentity
-	PrivateURL string `json:"-"`
-	IsExternal bool   `json:"-"`
-	Sequence   int    `json:"-"`
+	PrivateURL string      `json:"-"`
+	IsExternal bool        `json:"-"`
+	Sequence   int         `json:"-"`
+	Facets     []facetInfo `json:"-"`
+}
+
+type facetInfo struct {
+	ID   string `json:"id"`
+	Name string `json:"name"`
 }
 
 // poolResponse contains pool identity and providers details
 type poolResponse struct {
 	*v4api.PoolIdentity
 	Providers *[]v4api.Provider `json:"providers"`
+	Facets    []facetInfo       `json:"facets,omitempty"`
 }
 
 type poolSort struct {

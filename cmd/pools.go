@@ -5,9 +5,9 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"log"
 	"net/http"
+	"slices"
 	"time"
 
 	"github.com/uvalib/virgo4-api/v4api"
@@ -66,6 +66,12 @@ func (svc *ServiceContext) GetPoolsRequest(c *gin.Context) {
 
 	for outstandingRequests > 0 {
 		poolResp := <-channel
+		poolIdx := slices.IndexFunc(pools, func(p *pool) bool {
+			return p.V4ID.ID == poolResp.ID
+		})
+		if poolIdx > -1 {
+			poolResp.Facets = pools[poolIdx].Facets
+		}
 		out = append(out, poolResp)
 		outstandingRequests--
 	}
@@ -156,8 +162,19 @@ func identifyPool(dbSrc *source, channel chan *identifyResult, httpClient *http.
 			break
 		}
 	}
+
+	var facets struct {
+		Facets []facetInfo
+	}
+	if err := json.Unmarshal(respTxt, &facets); err != nil {
+		log.Printf("ERROR: Unable to parse facets response from %s: %s", dbSrc.PrivateURL, err.Error())
+	} else {
+		identity.Facets = facets.Facets
+	}
+
 	poolsNS := time.Since(start)
 	log.Printf("%s identified as %s. Time: %d ms", dbSrc.Name, identity.V4ID.Name, int64(poolsNS/time.Millisecond))
+	log.Printf("%s has facets %v", dbSrc.Name, identity.Facets)
 	channel <- &identifyResult{Pool: &identity, Error: nil}
 }
 
@@ -184,10 +201,9 @@ func poolProviders(pool *v4api.PoolIdentity, channel chan *poolResponse, httpCli
 		channel <- &poolRes
 		return
 	}
-	respTxt, _ := ioutil.ReadAll(resp.Body)
+	respTxt, _ := io.ReadAll(resp.Body)
 	var prov v4api.PoolProviders
-	err = json.Unmarshal(respTxt, &prov)
-	if err != nil {
+	if err := json.Unmarshal(respTxt, &prov); err != nil {
 		log.Printf("ERROR: %s returned invalid data: %s: ", URL, err.Error())
 		channel <- &poolRes
 		return
