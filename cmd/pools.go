@@ -70,7 +70,7 @@ func (svc *ServiceContext) GetPoolsRequest(c *gin.Context) {
 			return p.V4ID.ID == poolResp.ID
 		})
 		if poolIdx > -1 {
-			poolResp.Facets = pools[poolIdx].Facets
+			poolResp.Filters = pools[poolIdx].Filters
 		}
 		out = append(out, poolResp)
 		outstandingRequests--
@@ -163,18 +163,18 @@ func identifyPool(dbSrc *source, channel chan *identifyResult, httpClient *http.
 		}
 	}
 
-	var facets struct {
-		Facets []facetInfo
+	var filters struct {
+		Filters []filterInfo
 	}
-	if err := json.Unmarshal(respTxt, &facets); err != nil {
+	if err := json.Unmarshal(respTxt, &filters); err != nil {
 		log.Printf("ERROR: Unable to parse facets response from %s: %s", dbSrc.PrivateURL, err.Error())
 	} else {
-		identity.Facets = facets.Facets
+		identity.Filters = filters.Filters
 	}
 
 	poolsNS := time.Since(start)
 	log.Printf("%s identified as %s. Time: %d ms", dbSrc.Name, identity.V4ID.Name, int64(poolsNS/time.Millisecond))
-	log.Printf("%s has facets %v", dbSrc.Name, identity.Facets)
+	log.Printf("%s has facets %v", dbSrc.Name, identity.Filters)
 	channel <- &identifyResult{Pool: &identity, Error: nil}
 }
 
