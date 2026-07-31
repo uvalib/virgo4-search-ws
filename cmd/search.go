@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"slices"
 	"sort"
+	"strings"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -155,11 +156,17 @@ func (svc *ServiceContext) searchPool(pool *pool, req clientSearchRequest, heade
 		}
 	}
 
+	// check for date BEFORE or AFTER since they are slow. If so, the timeout will be increased
+	slowDateFilter := strings.Contains(poolReq.Query, "date:") && (strings.Contains(poolReq.Query, "AFTER") || strings.Contains(poolReq.Query, "BEFORE"))
+
 	reqBytes, _ := json.Marshal(poolReq)
 	httpClient := svc.HTTPClient
 	if pool.IsExternal {
 		log.Printf("Pool %s is managed externally, reduce timeout to 5 seconds", pool.V4ID.Name)
 		httpClient = svc.FastHTTPClient
+	} else if slowDateFilter {
+		log.Printf("Pool %s has date BEFORE or AFTER, increase http timeout", pool.V4ID.Name)
+		httpClient = svc.SlowHTTPClient
 	}
 	postResp := serviceRequest("POST", sURL, reqBytes, headers, httpClient)
 	results := NewPoolResult(pool, postResp.ElapsedMS)
