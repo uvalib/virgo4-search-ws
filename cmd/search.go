@@ -61,7 +61,8 @@ func (svc *ServiceContext) Search(c *gin.Context) {
 	}
 
 	// Do the search...
-	log.Printf("INFO: %s begins search for [%s] with filters %+v", claims.UserID, req.Query, req.Filters)
+	log.Printf("INFO: %s begins search for [%s] with filters %+v and filter value join operator [%s]",
+		claims.UserID, req.Query, req.Filters, req.Preferences.FilterJoin)
 	out := NewSearchResponse(&req)
 	start := time.Now()
 	channel := make(chan *v4api.PoolResult)
