@@ -110,7 +110,7 @@ func (svc *ServiceContext) HealthCheck(c *gin.Context) {
 		log.Printf("ERROR: Failed response from PSQL healthcheck: %s", dbResp.Error.Error())
 		hcMap["postgres"] = hcResp{Healthy: false, Message: dbResp.Error.Error()}
 	} else {
-	hcMap["postgres"] = hcResp{Healthy: true}
+		hcMap["postgres"] = hcResp{Healthy: true}
 	}
 
 	c.JSON(http.StatusOK, hcMap)
@@ -210,7 +210,7 @@ func serviceRequest(verb string, url string, body []byte, headers map[string]str
 		// This ensures the log filters pick up real errors
 		// Also pool timeouts are considered warnings cos we are adding a special filter
 		// to track them independently
-		if err.StatusCode == http.StatusNotImplemented || err.StatusCode == http.StatusRequestTimeout {
+		if err.StatusCode == http.StatusNotImplemented || err.StatusCode == http.StatusRequestTimeout || err.StatusCode == http.StatusUnauthorized {
 			logLevel = "WARNING"
 		}
 		log.Printf("%s: Failed response from POST %s - %d:%s. Elapsed Time: %d (ms)",

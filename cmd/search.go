@@ -69,7 +69,9 @@ func (svc *ServiceContext) Search(c *gin.Context) {
 	outstandingRequests := 0
 	for _, p := range pools {
 		out.Pools = append(out.Pools, p.V4ID)
-		if slices.Contains(exclusions, p.V4ID.ID) {
+		if claims.UserID == "anonymous" && (p.V4ID.ID == "worldcat" || p.V4ID.ID == "jmrl") {
+			log.Printf("INFO: skipping pool %s for anonymous user", p.V4ID.ID)
+		} else if slices.Contains(exclusions, p.V4ID.ID) {
 			log.Printf("INFO: skipping pool %s because it was excluded by %s", p.V4ID.ID, claims.UserID)
 		} else {
 			outstandingRequests++
