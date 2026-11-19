@@ -239,7 +239,6 @@ func (f *filterCache) getPoolFilters(pool *pool, channel chan *filterResponse, h
 			"SubjectGeographic": true,
 			"Language":          true,
 			"Publisher":         true,
-			"SourceType":        true,
 		}
 
 	case strings.HasPrefix(pool.V4ID.Source, "solr") == true:
