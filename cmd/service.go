@@ -60,7 +60,7 @@ func InitializeService(version string, cfg *ServiceConfig) *ServiceContext {
 	}
 	svc.HTTPClient = &http.Client{
 		Transport: defaultTransport,
-		Timeout:   10 * time.Second,
+		Timeout:   11 * time.Second, // bump 10 11 sec as many requests to solr take just a fraction longer tha 10sec
 	}
 	svc.FastHTTPClient = &http.Client{
 		Transport: defaultTransport,

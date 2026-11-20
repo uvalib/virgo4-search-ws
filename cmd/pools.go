@@ -157,8 +157,9 @@ func identifyPool(dbSrc *source, channel chan *identifyResult, httpClient *http.
 	identity.PrivateURL = dbSrc.PrivateURL
 	identity.V4ID.URL = dbSrc.PublicURL
 	for _, attr := range identity.V4ID.Attributes {
-		if attr.Name == "external_hold" && attr.Supported == true {
+		if attr.Name == "external_url" && attr.Supported == true {
 			identity.IsExternal = true
+			log.Printf("INFO: %s is an external pool", dbSrc.Name)
 			break
 		}
 	}
